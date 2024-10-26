@@ -25,13 +25,13 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           if [[ $TAG == *-prod ]]; then
-            echo "ENVIRONMENT=prod" >> $GITHUB_OUTPUT
+            echo "ENVIRONMENT=production" >> $GITHUB_OUTPUT
             echo "EC2_HOST=${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT
             echo "EC2_USERNAME=${{ secrets.PROD_EC2_USERNAME }}" >> $GITHUB_OUTPUT
             echo "EC2_SSH_KEY=${{ secrets.PROD_EC2_SSH_KEY }}" >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
           else
-            echo "ENVIRONMENT=dev" >> $GITHUB_OUTPUT
+            echo "ENVIRONMENT=development" >> $GITHUB_OUTPUT
             echo "EC2_HOST=${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT
             echo "EC2_USERNAME=${{ secrets.DEV_EC2_USERNAME }}" >> $GITHUB_OUTPUT
             echo "EC2_SSH_KEY=${{ secrets.DEV_EC2_SSH_KEY }}" >> $GITHUB_OUTPUT
@@ -139,13 +139,29 @@ jobs:
               driver: bridge
           EOF
 
+      - name: Generate environment .env
+        env:
+          ENVIRONMENT: ${{ steps.set-env.outputs.ENVIRONMENT }}
+          IMAGE_TAG: ${{ steps.set-env.outputs.IMAGE_TAG }}
+        run: |
+          cat << EOF > .env
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+          POSTGRES_DB=postgres-${ENVIRONMENT}
+          PROJECT_NAME=${{ secrets.PROJECT_NAME }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}
+          HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}
+          HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}
+          EOF
+
       - name: Copy files to EC2
         uses: appleboy/scp-action@master
         with:
           host: ${{ steps.set-env.outputs.EC2_HOST }}
           username: ${{ steps.set-env.outputs.EC2_USERNAME }}
           key: ${{ steps.set-env.outputs.EC2_SSH_KEY }}
-          source: "docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml,.env.${{ steps.set-env.outputs.ENVIRONMENT }}"
+          source: "docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml,.env"
           target: "~/app"
 
       - name: Deploy to EC2
