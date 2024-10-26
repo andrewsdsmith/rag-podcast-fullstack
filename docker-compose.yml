@@ -35,12 +35,12 @@ services:
       - --reload
       - "app/main.py"
     environment:
-      - environment=local
+      - ENVIRONMENT=local
       - PROJECT_NAME=Full Stack RAG Podcast QA
-      - OPENAI_API_KEY=sk-
+      - OPENAI_API_KEY=
       - OPENAI_MODEL=gpt-4
-      - HF_EMBEDDING_MODEL=jinaai/jina-embeddings-v3
-      - HF_EMBEDDER_AUTH_TOKEN=hf_
+      - HF_EMBEDDING_MODEL=
+      - HF_EMBEDDER_AUTH_TOKEN=
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
       - POSTGRES_SERVER=db
