@@ -1,0 +1,204 @@
+<div
+  class="min-h-screen bg-gradient-to-br from-gray-800 to-gray-900 p-4 md:p-6 flex items-center justify-center"
+>
+  <!-- Beta Badge and Tech Stack Icon -->
+  <div class="absolute top-2 right-2 flex flex-col items-end space-y-1">
+    <!-- Beta Badge -->
+    <span
+      class="bg-gray-700 text-white text-sm font-bold py-1 px-3 rounded-lg shadow-md"
+    >
+      Beta 🚀
+    </span>
+
+    <!-- Pancake Stack Icon for Small Screens -->
+    <div
+      class="sm:hidden relative group mt-2"
+      appClickOutside
+      (clickOutside)="showTechStackTooltip = false"
+    >
+      <span
+        class="text-gray-400 cursor-pointer text-2xl"
+        title="Click to view tech stack"
+        (click)="toggleTechStackTooltip()"
+      >
+        🥞
+      </span>
+
+      <!-- Tooltip for Tech Stack -->
+      <div
+        *ngIf="showTechStackTooltip"
+        class="absolute top-full right-0 mt-2 w-40 bg-gray-800 text-white text-xs p-2 rounded-lg shadow-lg z-10"
+      >
+        <p>
+          <span class="font-bold">Backend:</span> FastAPI, Haystack 2.0, GPT-4,
+          SSE, Postgres
+        </p>
+        <p>
+          <span class="font-bold">Frontend:</span> Angular 18, Tailwind CSS,
+          HyperUI
+        </p>
+        <p><span class="font-bold">Deployment:</span> Docker, Nginx, AWS</p>
+      </div>
+    </div>
+
+    <!-- Tech Stack (Visible only on larger screens) -->
+    <div
+      class="hidden sm:flex text-gray-400 text-xs md:text-sm flex-col items-end"
+    >
+      <span>Backend powered by:</span>
+      <strong class="text-white">FastAPI</strong>
+      <strong class="text-white">Haystack 2.0</strong>
+      <strong class="text-white">GPT-4</strong>
+      <strong class="text-white">SSE</strong>
+      <strong class="text-white">Postgres</strong>
+
+      <span>Frontend powered by:</span>
+      <strong class="text-white">Angular 18</strong>
+      <strong class="text-white">Tailwind CSS</strong>
+      <strong class="text-white">HyperUI</strong>
+
+      <span>Deployment:</span>
+      <strong class="text-white">Docker</strong>
+      <strong class="text-white">Nginx</strong>
+      <strong class="text-white">AWS</strong>
+    </div>
+  </div>
+
+  <!-- Main Content Area -->
+  <div
+    class="w-full max-w-lg md:max-w-3xl bg-gray-100 rounded-2xl shadow-xl overflow-hidden"
+  >
+    <div class="p-4 md:p-8">
+      <h1
+        class="text-2xl md:text-3xl font-bold text-gray-800 mb-4 md:mb-6 text-center md:text-left"
+      >
+        Health and nutrition related questions?
+      </h1>
+
+      <!-- Question Input Area -->
+      <div
+        class="flex flex-col md:flex-row items-center space-y-4 md:space-y-0 md:space-x-4 mb-6"
+      >
+        <input
+          type="text"
+          class="w-full md:flex-1 px-4 py-3 text-gray-700 bg-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-600"
+          placeholder="Type your question here... "
+          [(ngModel)]="userQuestion"
+          (keyup.enter)="submitQuestion()"
+        />
+        <button
+          (click)="submitQuestion()"
+          class="w-full md:w-auto bg-gradient-to-r from-gray-700 to-gray-900 hover:from-black hover:to-gray-800 text-white font-bold py-3 px-4 rounded-lg shadow-lg transition duration-300 ease-in-out transform hover:scale-105 flex justify-center items-center"
+        >
+          <img src="send-arrow-white.svg" alt="Search Icon" class="w-6 h-6" />
+        </button>
+      </div>
+
+      <!-- Example Question Blocks -->
+      <div class="mt-8">
+        <h2
+          class="text-lg md:text-xl font-semibold text-gray-800 mb-4 text-center md:text-left"
+        >
+          Example Questions:
+        </h2>
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <button
+            class="bg-gray-200 hover:bg-gray-300 p-4 rounded-lg shadow transition duration-300 ease-in-out transform hover:scale-105"
+            (click)="populateAndSubmit('What is intermittent fasting?')"
+          >
+            🥗 What is intermittent fasting?
+          </button>
+          <button
+            class="bg-gray-200 hover:bg-gray-300 p-4 rounded-lg shadow transition duration-300 ease-in-out transform hover:scale-105"
+            (click)="
+              populateAndSubmit('How does gut health affect metabolism?')
+            "
+          >
+            🦠 How does gut health affect metabolism?
+          </button>
+          <button
+            class="bg-gray-200 hover:bg-gray-300 p-4 rounded-lg shadow transition duration-300 ease-in-out transform hover:scale-105"
+            (click)="
+              populateAndSubmit('What are the benefits of a plant-based diet?')
+            "
+          >
+            🌱 What are the benefits of a plant-based diet?
+          </button>
+        </div>
+      </div>
+
+      <!-- Error Message Section -->
+      <div
+        *ngIf="error()"
+        class="mt-6 bg-red-100 text-red-700 p-4 rounded-lg shadow"
+      >
+        <p>🚨 Oops! Something went wrong: {{ errorMessage() }}</p>
+        <button
+          (click)="retrySubmit()"
+          class="mt-2 bg-gray-800 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-gray-700 transition"
+        >
+          Retry 🔄
+        </button>
+      </div>
+
+      <!-- Loading skeleton when waiting for the response -->
+      <div
+        *ngIf="isLoading() && !answer()"
+        class="animate-pulse space-y-2 mt-6"
+      >
+        <div class="h-4 bg-gray-400 rounded w-3/4"></div>
+        <div class="h-4 bg-gray-400 rounded"></div>
+        <div class="h-4 bg-gray-400 rounded w-5/6"></div>
+      </div>
+
+      <!-- Rendered Markdown Answer with Background -->
+      <div
+        *ngIf="answer()"
+        class="mt-6 p-4 rounded-lg bg-gray-200 text-gray-800 space-y-4 overflow-y-auto max-h-96 md:max-h-full"
+        style="scroll-behavior: smooth"
+      >
+        <div [innerHTML]="renderedAnswer()"></div>
+      </div>
+    </div>
+
+    <!-- Warning Message Footer -->
+    <div
+      class="bg-gray-700 text-white text-center py-2 px-4 mt-6 rounded-b-lg text-sm md:text-base"
+    >
+      ⚠️ This is a personal portfolio project and not for commercial use.
+      Information is sourced from Zoe Science and Nutrition Podcast. Please do
+      not use this application for medical advice. Always consult a healthcare
+      professional for any health-related concerns. Thank you! 🙏
+    </div>
+  </div>
+
+  <!-- Popup Modal (Initially Visible) -->
+  <div
+    *ngIf="showPopup"
+    class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center"
+  >
+    <div
+      class="bg-white rounded-lg shadow-lg max-w-sm md:max-w-md mx-auto p-6 text-center"
+    >
+      <h2 class="text-xl md:text-2xl font-bold text-gray-800 mb-4">
+        ⚠️ Important Disclaimer
+      </h2>
+      <p class="text-gray-700 text-sm md:text-base mb-6">
+        This is a personal portfolio project, not intended for commercial use.
+        The information provided comes from the
+        <strong>Zoe Science and Nutrition Podcast</strong>. I enjoy listening to
+        the podcast and I wanted to implement a RAG application to showcase my
+        skills. The podcast transcripts have been summarised and paraphrased for
+        this project. Please do not use this application for medical advice.
+        Always consult a healthcare professional for any health-related
+        concerns. Thank you!
+      </p>
+      <button
+        (click)="closePopup()"
+        class="bg-gray-800 text-white font-semibold py-2 px-4 rounded-lg shadow-lg hover:bg-gray-700 transition ease-in-out"
+      >
+        Got it! 👍
+      </button>
+    </div>
+  </div>
+</div>

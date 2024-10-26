@@ -1,0 +1,22 @@
+#! /usr/bin/env bash
+
+set -e
+set -x
+
+# Let the DB start
+python app/backend_pre_start.py
+
+# Run migrations
+alembic upgrade head
+
+# Create initial data in DB
+python app/initial_data.py
+
+# Seed the DB using sql dump
+# Reference db container by hostname. Include password in env variable
+
+# Export the password so that it can be used by the psql command
+export PGPASSWORD="${POSTGRES_PASSWORD}"
+
+# Reference environment variables inside the container
+psql -h "${POSTGRES_SERVER}" -p 5432 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -a -f app/sql/seed.sql
