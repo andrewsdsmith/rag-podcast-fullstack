@@ -2,6 +2,8 @@ name: Deploy to Environment
 
 on:
   push:
+    branches:
+      - chore/aws-actions-deploy
     tags:
       - "v*-dev" # matches v1.0.0-dev, v1.2.3-dev, etc.
       - "v*-prod" # matches v1.0.0-prod, v1.2.3-prod, etc.
