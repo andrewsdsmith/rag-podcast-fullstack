@@ -5,8 +5,8 @@ on:
     branches:
       - chore/aws-actions-deploy
     tags:
-      - "v*-dev" # matches v1.0.0-dev, v1.2.3-dev, etc.
-      - "v*-prod" # matches v1.0.0-prod, v1.2.3-prod, etc.
+      - "v*-dev"
+      - "v*-prod"
 
 env:
   AWS_REGION: eu-west-2
@@ -21,7 +21,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Set environment-specific variables based on tag
       - name: Set environment variables
         id: set-env
         run: |
@@ -30,15 +29,17 @@ jobs:
             echo "ENVIRONMENT=production" >> $GITHUB_OUTPUT
             echo "EC2_HOST=${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT
             echo "EC2_USERNAME=${{ secrets.PROD_EC2_USERNAME }}" >> $GITHUB_OUTPUT
-            echo -n "EC2_SSH_KEY=" >> $GITHUB_OUTPUT
-            echo "${{ secrets.PROD_EC2_SSH_KEY }}" | awk '{printf "%s\\n", $0}' >> $GITHUB_OUTPUT
+            echo "EC2_SSH_KEY<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ secrets.PROD_EC2_SSH_KEY }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
           else
             echo "ENVIRONMENT=development" >> $GITHUB_OUTPUT
             echo "EC2_HOST=${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT
             echo "EC2_USERNAME=${{ secrets.DEV_EC2_USERNAME }}" >> $GITHUB_OUTPUT
-            echo -n "EC2_SSH_KEY=" >> $GITHUB_OUTPUT
-            echo "${{ secrets.DEV_EC2_SSH_KEY }}" | awk '{printf "%s\\n", $0}' >> $GITHUB_OUTPUT
+            echo "EC2_SSH_KEY<<EOF" >> $GITHUB_OUTPUT
+            echo "${{ secrets.DEV_EC2_SSH_KEY }}" >> $GITHUB_OUTPUT
+            echo "EOF" >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
           fi
 
@@ -69,7 +70,6 @@ jobs:
           tags: |
             ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest
 
-      # Rest of your workflow remains the same...
       - name: Generate environment docker-compose
         env:
           ENVIRONMENT: ${{ steps.set-env.outputs.ENVIRONMENT }}
@@ -98,7 +98,7 @@ jobs:
                 retries: 5
 
             backend:
-              image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${IMAGE_TAG}
+              image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${ENVIRONMENT}-latest
               container_name: fullstack-rag-backend-${ENVIRONMENT}
               depends_on:
                 db:
@@ -122,7 +122,7 @@ jobs:
                 - rag-network-${ENVIRONMENT}
 
             frontend:
-              image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_FRONTEND }}:${IMAGE_TAG}
+              image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_FRONTEND }}:${ENVIRONMENT}-latest
               container_name: fullstack-rag-frontend-${ENVIRONMENT}
               depends_on:
                 - backend
@@ -144,9 +144,8 @@ jobs:
       - name: Generate environment .env
         env:
           ENVIRONMENT: ${{ steps.set-env.outputs.ENVIRONMENT }}
-          IMAGE_TAG: ${{ steps.set-env.outputs.IMAGE_TAG }}
         run: |
-          cat << EOF > .env
+          cat << EOF > .env.${{ steps.set-env.outputs.ENVIRONMENT }}
           POSTGRES_USER=postgres
           POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
           POSTGRES_DB=postgres-${ENVIRONMENT}
@@ -175,5 +174,5 @@ jobs:
           script: |
             cd ~/app
             aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
-            docker compose -f docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml pull
-            docker compose -f docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml up -d
+            docker compose -f docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml --env-file .env.${{ steps.set-env.outputs.ENVIRONMENT }} pull
+            docker compose -f docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml --env-file .env.${{ steps.set-env.outputs.ENVIRONMENT }} up -d
