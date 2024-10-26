@@ -28,13 +28,15 @@ jobs:
             echo "ENVIRONMENT=production" >> $GITHUB_OUTPUT
             echo "EC2_HOST=${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT
             echo "EC2_USERNAME=${{ secrets.PROD_EC2_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "EC2_SSH_KEY=${{ secrets.PROD_EC2_SSH_KEY }}" >> $GITHUB_OUTPUT
+            echo -n "EC2_SSH_KEY=" >> $GITHUB_OUTPUT
+            echo "${{ secrets.PROD_EC2_SSH_KEY }}" | awk '{printf "%s\\n", $0}' >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
           else
             echo "ENVIRONMENT=development" >> $GITHUB_OUTPUT
             echo "EC2_HOST=${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT
             echo "EC2_USERNAME=${{ secrets.DEV_EC2_USERNAME }}" >> $GITHUB_OUTPUT
-            echo "EC2_SSH_KEY=${{ secrets.DEV_EC2_SSH_KEY }}" >> $GITHUB_OUTPUT
+            echo -n "EC2_SSH_KEY=" >> $GITHUB_OUTPUT
+            echo "${{ secrets.DEV_EC2_SSH_KEY }}" | awk '{printf "%s\\n", $0}' >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
           fi
 
@@ -161,7 +163,7 @@ jobs:
           host: ${{ steps.set-env.outputs.EC2_HOST }}
           username: ${{ steps.set-env.outputs.EC2_USERNAME }}
           key: ${{ steps.set-env.outputs.EC2_SSH_KEY }}
-          source: "docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml,.env"
+          source: "docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml,.env.${{ steps.set-env.outputs.ENVIRONMENT }}"
           target: "~/app"
 
       - name: Deploy to EC2
