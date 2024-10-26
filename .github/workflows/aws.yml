@@ -10,8 +10,8 @@ on:
 
 env:
   AWS_REGION: eu-west-2
-  ECR_REPOSITORY_FRONTEND: rag-frontend
-  ECR_REPOSITORY_BACKEND: rag-backend
+  ECR_REPOSITORY_FRONTEND: rag-podcast-fullstack/frontend
+  ECR_REPOSITORY_BACKEND: rag-podcast-fullstack/backend
 
 jobs:
   deploy:
