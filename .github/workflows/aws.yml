@@ -97,45 +97,22 @@ jobs:
         run: |
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets '[{"Key":"InstanceIds","Values":["${{ steps.set-env.outputs.EC2_INSTANCE_ID }}"]}]' \
-            --parameters '{"commands":[
-              "cd ${{ env.APP_DIR }}",
-              
-              # Create .env file
-              "cat << EOF > .env
-              POSTGRES_USER=postgres
-              POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-              POSTGRES_DB=postgres-${{ steps.set-env.outputs.ENVIRONMENT }}
-              PROJECT_NAME=${{ secrets.PROJECT_NAME }}
-              OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-              OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}
-              HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}
-              HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}
-              EOF",
-              
-              # Login to ECR
-              "aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
-              
-              # Move new files into place
-              "mv temp/docker-compose.yml docker-compose.yml",
-              "rmdir temp",
-              
-              # Stop existing containers
-              "docker compose down || true",
-              
-              # Clean up old images
-              "docker system prune -f",
-              
-              # Pull and start new containers
-              "docker compose pull",
-              "docker compose up -d",
-              
-              # Verify deployment
-              "docker compose ps --format json",
-              "docker compose logs --tail=50"
-            ]}' \
+            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
+            --parameters "{\"commands\":[
+              \"cd ${{ env.APP_DIR }}\",
+              \"cat > .env << 'EOL'\\nPOSTGRES_USER=postgres\\nPOSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}\\nPOSTGRES_DB=postgres-${{ steps.set-env.outputs.ENVIRONMENT }}\\nPROJECT_NAME=${{ secrets.PROJECT_NAME }}\\nOPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}\\nOPENAI_MODEL=${{ secrets.OPENAI_MODEL }}\\nHF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}\\nHF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}\\nEOL\",
+              \"aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}\",
+              \"mv temp/docker-compose.yml docker-compose.yml\",
+              \"rmdir temp\",
+              \"docker compose down || true\",
+              \"docker system prune -f\",
+              \"docker compose pull\",
+              \"docker compose up -d\",
+              \"docker compose ps --format json\",
+              \"docker compose logs --tail=50\"
+            ]}" \
             --comment "Deployment from GitHub Actions" \
-            --timeout-seconds 600
+            --timeout-seconds 600 \
 
       - name: Verify Deployment
         run: |
