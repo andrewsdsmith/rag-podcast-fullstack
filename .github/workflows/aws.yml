@@ -12,6 +12,7 @@ env:
   AWS_REGION: eu-west-2
   ECR_REPOSITORY_FRONTEND: rag-podcast-fullstack/frontend
   ECR_REPOSITORY_BACKEND: rag-podcast-fullstack/backend
+  APP_DIR: /home/ec2-user/app # Explicit directory path
 
 jobs:
   deploy:
@@ -53,33 +54,82 @@ jobs:
           sed "s|\${FRONTEND_IMAGE}|$FRONTEND_IMAGE|g; s|\${BACKEND_IMAGE}|$BACKEND_IMAGE|g; s|\${ENVIRONMENT}|${{ steps.set-env.outputs.ENVIRONMENT }}|g" \
             docker-compose.template.yml > docker-compose.yml
 
-      - name: Deploy using SSM
+      - name: Copy files to EC2
         run: |
-          # Upload docker-compose.yml and .env file to EC2
+          # Create a temporary directory for deployment files
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets '[{"Key":"InstanceIds","Values":["${{ steps.set-env.outputs.EC2_INSTANCE_ID }}"]}]' \
             --parameters '{"commands":[
-                "mkdir -p ~/app",
-                "echo Uploading Docker Compose file and environment variables",
-                "cat << EOF > ~/app/.env",
-                "POSTGRES_USER=postgres",
-                "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}",
-                "POSTGRES_DB=postgres-${{ steps.set-env.outputs.ENVIRONMENT }}",
-                "PROJECT_NAME=${{ secrets.PROJECT_NAME }}",
-                "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}",
-                "OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}",
-                "HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}",
-                "HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}",
-                "EOF",
-                
-                "aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
-                "cd ~/app",
-                "docker compose -f docker-compose.yml --env-file .env pull",
-                "docker compose -f docker-compose.yml --env-file .env up -d"
+              "mkdir -p ${{ env.APP_DIR }}",
+              "mkdir -p ${{ env.APP_DIR }}/temp"
+            ]}'
+
+          # Encode files as base64 and send them via SSM
+          DOCKER_COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
+
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets '[{"Key":"InstanceIds","Values":["${{ steps.set-env.outputs.EC2_INSTANCE_ID }}"]}]' \
+            --parameters '{"commands":[
+              "echo \"'\"$DOCKER_COMPOSE_B64\"'\" | base64 -d > ${{ env.APP_DIR }}/temp/docker-compose.yml"
+            ]}'
+
+      - name: Deploy using SSM
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets '[{"Key":"InstanceIds","Values":["${{ steps.set-env.outputs.EC2_INSTANCE_ID }}"]}]' \
+            --parameters '{"commands":[
+              "cd ${{ env.APP_DIR }}",
+              
+              # Create .env file
+              "cat << EOF > .env
+              POSTGRES_USER=postgres
+              POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+              POSTGRES_DB=postgres-${{ steps.set-env.outputs.ENVIRONMENT }}
+              PROJECT_NAME=${{ secrets.PROJECT_NAME }}
+              OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+              OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}
+              HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}
+              HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}
+              EOF",
+              
+              # Login to ECR
+              "aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
+              
+              # Move new files into place
+              "mv temp/docker-compose.yml docker-compose.yml",
+              "rmdir temp",
+              
+              # Stop existing containers
+              "docker compose down || true",
+              
+              # Clean up old images
+              "docker system prune -f",
+              
+              # Pull and start new containers
+              "docker compose pull",
+              "docker compose up -d",
+              
+              # Verify deployment
+              "docker compose ps --format json",
+              "docker compose logs --tail=50"
             ]}' \
-            --comment "Deployment from GitHub Actions"
-        env:
-          AWS_REGION: ${{ env.AWS_REGION }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            --comment "Deployment from GitHub Actions" \
+            --timeout-seconds 600
+
+      - name: Verify Deployment
+        run: |
+          # Wait for services to be healthy
+          sleep 30
+
+          # Check container status
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets '[{"Key":"InstanceIds","Values":["${{ steps.set-env.outputs.EC2_INSTANCE_ID }}"]}]' \
+            --parameters '{"commands":[
+              "cd ${{ env.APP_DIR }}",
+              "docker compose ps",
+              "docker compose logs --tail=100"
+            ]}'
