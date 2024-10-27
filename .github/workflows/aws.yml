@@ -56,24 +56,42 @@ jobs:
 
       - name: Copy files to EC2
         run: |
-          # Create a temporary directory for deployment files
+          # Create deployment directories
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets '[{"Key":"InstanceIds","Values":["${{ steps.set-env.outputs.EC2_INSTANCE_ID }}"]}]' \
-            --parameters '{"commands":[
-              "mkdir -p ${{ env.APP_DIR }}",
-              "mkdir -p ${{ env.APP_DIR }}/temp"
-            ]}'
+            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
+            --parameters "{\"commands\":[
+              \"mkdir -p ${{ env.APP_DIR }}\",
+              \"mkdir -p ${{ env.APP_DIR }}/temp\",
+              \"chmod 755 ${{ env.APP_DIR }}\",
+              \"chmod 755 ${{ env.APP_DIR }}/temp\"
+            ]}" \
+            --output text
 
-          # Encode files as base64 and send them via SSM
+          # Wait for directory creation
+          sleep 5
+
+          # Encode and transfer docker-compose file
           DOCKER_COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
 
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
-            --targets '[{"Key":"InstanceIds","Values":["${{ steps.set-env.outputs.EC2_INSTANCE_ID }}"]}]' \
-            --parameters '{"commands":[
-              "echo \"'\"$DOCKER_COMPOSE_B64\"'\" | base64 -d > ${{ env.APP_DIR }}/temp/docker-compose.yml"
-            ]}'
+            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
+            --parameters "{\"commands\":[
+              \"echo '${DOCKER_COMPOSE_B64}' | base64 -d > ${{ env.APP_DIR }}/temp/docker-compose.yml\",
+              \"if [ -f ${{ env.APP_DIR }}/temp/docker-compose.yml ]; then echo 'File transfer successful'; else echo 'File transfer failed' >&2; exit 1; fi\"
+            ]}" \
+            --output text
+
+          # Verify file permissions and content
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
+            --parameters "{\"commands\":[
+              \"ls -la ${{ env.APP_DIR }}/temp/docker-compose.yml\",
+              \"head -n 1 ${{ env.APP_DIR }}/temp/docker-compose.yml\"
+            ]}" \
+            --output text
 
       - name: Deploy using SSM
         run: |
