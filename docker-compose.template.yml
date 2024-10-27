@@ -1,0 +1,63 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: fullstack-rag-pgvector-db-${ENVIRONMENT}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata-${ENVIRONMENT}:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - rag-network-${ENVIRONMENT}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    image: ${BACKEND_IMAGE}
+    container_name: fullstack-rag-backend-${ENVIRONMENT}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      environment: ${ENVIRONMENT}
+      PROJECT_NAME: ${PROJECT_NAME}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL}
+      HF_EMBEDDING_MODEL: ${HF_EMBEDDING_MODEL}
+      HF_EMBEDDER_AUTH_TOKEN: ${HF_EMBEDDER_AUTH_TOKEN}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+    networks:
+      - rag-network-${ENVIRONMENT}
+
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    container_name: fullstack-rag-frontend-${ENVIRONMENT}
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - rag-network-${ENVIRONMENT}
+
+volumes:
+  pgdata-${ENVIRONMENT}:
+    driver: local
+
+networks:
+  rag-network-${ENVIRONMENT}:
+    name: rag-network-${ENVIRONMENT}
+    driver: bridge

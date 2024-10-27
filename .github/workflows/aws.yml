@@ -46,98 +46,37 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Prepare Docker Compose File
+        run: |
+          FRONTEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_FRONTEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest"
+          BACKEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest"
+          sed "s|\${FRONTEND_IMAGE}|$FRONTEND_IMAGE|g; s|\${BACKEND_IMAGE}|$BACKEND_IMAGE|g; s|\${ENVIRONMENT}|${{ steps.set-env.outputs.ENVIRONMENT }}|g" \
+            docker-compose.template.yml > docker-compose.yml
+
       - name: Deploy using SSM
         run: |
+          # Upload docker-compose.yml and .env file to EC2
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets '[{"Key":"InstanceIds","Values":["${{ steps.set-env.outputs.EC2_INSTANCE_ID }}"]}]' \
             --parameters '{"commands":[
-                "echo Creating Docker Compose file on instance",
-                "cat << EOF > ~/app/docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml",
-                "services:",
-                "  db:",
-                "    image: pgvector/pgvector:pg16",
-                "    container_name: fullstack-rag-pgvector-db-${ENVIRONMENT}",
-                "    environment:",
-                "      POSTGRES_USER: \${POSTGRES_USER}",
-                "      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD}",
-                "      POSTGRES_DB: \${POSTGRES_DB}",
-                "    ports:",
-                "      - '5432:5432'",
-                "    volumes:",
-                "      - pgdata-${ENVIRONMENT}:/var/lib/postgresql/data",
-                "    restart: always",
-                "    networks:",
-                "      - rag-network-${ENVIRONMENT}",
-                "    healthcheck:",
-                "      test: ['CMD-SHELL', 'pg_isready -U postgres']",
-                "      interval: 5s",
-                "      timeout: 5s",
-                "      retries: 5",
-                "",
-                "  backend:",
-                "    image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${ENVIRONMENT}-latest",
-                "    container_name: fullstack-rag-backend-${ENVIRONMENT}",
-                "    depends_on:",
-                "      db:",
-                "        condition: service_healthy",
-                "    restart: always",
-                "    ports:",
-                "      - '8000:8000'",
-                "    environment:",
-                "      - environment=${ENVIRONMENT}",
-                "      - PROJECT_NAME=\${PROJECT_NAME}",
-                "      - OPENAI_API_KEY=\${OPENAI_API_KEY}",
-                "      - OPENAI_MODEL=\${OPENAI_MODEL}",
-                "      - HF_EMBEDDING_MODEL=\${HF_EMBEDDING_MODEL}",
-                "      - HF_EMBEDDER_AUTH_TOKEN=\${HF_EMBEDDER_AUTH_TOKEN}",
-                "      - POSTGRES_USER=\${POSTGRES_USER}",
-                "      - POSTGRES_PASSWORD=\${POSTGRES_PASSWORD}",
-                "      - POSTGRES_SERVER=db",
-                "      - POSTGRES_PORT=5432",
-                "      - POSTGRES_DB=\${POSTGRES_DB}",
-                "    networks:",
-                "      - rag-network-${ENVIRONMENT}",
-                "",
-                "  frontend:",
-                "    image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_FRONTEND }}:${ENVIRONMENT}-latest",
-                "    container_name: fullstack-rag-frontend-${ENVIRONMENT}",
-                "    depends_on:",
-                "      - backend",
-                "    ports:",
-                "      - '80:80'",
-                "    networks:",
-                "      - rag-network-${ENVIRONMENT}",
-                "",
-                "volumes:",
-                "  pgdata-${ENVIRONMENT}:",
-                "    driver: local",
-                "",
-                "networks:",
-                "  rag-network-${ENVIRONMENT}:",
-                "    name: rag-network-${ENVIRONMENT}",
-                "    driver: bridge",
-                "EOF",
-                
-                # Create .env file directly on the EC2 instance
-                "echo Creating environment file",
-                "cat << EOF > ~/app/.env.${{ steps.set-env.outputs.ENVIRONMENT }}",
+                "mkdir -p ~/app",
+                "echo Uploading Docker Compose file and environment variables",
+                "cat << EOF > ~/app/.env",
                 "POSTGRES_USER=postgres",
                 "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}",
-                "POSTGRES_DB=postgres-${ENVIRONMENT}",
+                "POSTGRES_DB=postgres-${{ steps.set-env.outputs.ENVIRONMENT }}",
                 "PROJECT_NAME=${{ secrets.PROJECT_NAME }}",
                 "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}",
                 "OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}",
                 "HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}",
                 "HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}",
                 "EOF",
-
-                # Login to ECR, pull images, and start containers
-                "echo Deploying application",
-                "cd ~/app",
+                
                 "aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
-                "docker compose -f docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml --env-file .env.${{ steps.set-env.outputs.ENVIRONMENT }} pull",
-                "docker compose -f docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml --env-file .env.${{ steps.set-env.outputs.ENVIRONMENT }} up -d"
+                "cd ~/app",
+                "docker compose -f docker-compose.yml --env-file .env pull",
+                "docker compose -f docker-compose.yml --env-file .env up -d"
             ]}' \
             --comment "Deployment from GitHub Actions"
         env:
