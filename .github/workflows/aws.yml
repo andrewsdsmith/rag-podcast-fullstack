@@ -27,13 +27,11 @@ jobs:
           TAG=${GITHUB_REF#refs/tags/}
           if [[ $TAG == *-prod ]]; then
             echo "ENVIRONMENT=production" >> $GITHUB_OUTPUT
-            echo "EC2_HOST=${{ secrets.PROD_EC2_HOST }}" >> $GITHUB_OUTPUT
-            echo "EC2_USERNAME=${{ secrets.PROD_EC2_USERNAME }}" >> $GITHUB_OUTPUT
+            echo "EC2_INSTANCE_ID=${{ secrets.PROD_EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
           else
             echo "ENVIRONMENT=development" >> $GITHUB_OUTPUT
-            echo "EC2_HOST=${{ secrets.DEV_EC2_HOST }}" >> $GITHUB_OUTPUT
-            echo "EC2_USERNAME=${{ secrets.DEV_EC2_USERNAME }}" >> $GITHUB_OUTPUT
+            echo "EC2_INSTANCE_ID=${{ secrets.DEV_EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
           fi
 
@@ -48,109 +46,101 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Generate environment docker-compose
+      - name: Deploy using SSM
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets '[{"Key":"InstanceIds","Values":["${{ steps.set-env.outputs.EC2_INSTANCE_ID }}"]}]' \
+            --parameters '{"commands":[
+                "echo Creating Docker Compose file on instance",
+                "cat << EOF > ~/app/docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml",
+                "services:",
+                "  db:",
+                "    image: pgvector/pgvector:pg16",
+                "    container_name: fullstack-rag-pgvector-db-${ENVIRONMENT}",
+                "    environment:",
+                "      POSTGRES_USER: \${POSTGRES_USER}",
+                "      POSTGRES_PASSWORD: \${POSTGRES_PASSWORD}",
+                "      POSTGRES_DB: \${POSTGRES_DB}",
+                "    ports:",
+                "      - '5432:5432'",
+                "    volumes:",
+                "      - pgdata-${ENVIRONMENT}:/var/lib/postgresql/data",
+                "    restart: always",
+                "    networks:",
+                "      - rag-network-${ENVIRONMENT}",
+                "    healthcheck:",
+                "      test: ['CMD-SHELL', 'pg_isready -U postgres']",
+                "      interval: 5s",
+                "      timeout: 5s",
+                "      retries: 5",
+                "",
+                "  backend:",
+                "    image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${ENVIRONMENT}-latest",
+                "    container_name: fullstack-rag-backend-${ENVIRONMENT}",
+                "    depends_on:",
+                "      db:",
+                "        condition: service_healthy",
+                "    restart: always",
+                "    ports:",
+                "      - '8000:8000'",
+                "    environment:",
+                "      - environment=${ENVIRONMENT}",
+                "      - PROJECT_NAME=\${PROJECT_NAME}",
+                "      - OPENAI_API_KEY=\${OPENAI_API_KEY}",
+                "      - OPENAI_MODEL=\${OPENAI_MODEL}",
+                "      - HF_EMBEDDING_MODEL=\${HF_EMBEDDING_MODEL}",
+                "      - HF_EMBEDDER_AUTH_TOKEN=\${HF_EMBEDDER_AUTH_TOKEN}",
+                "      - POSTGRES_USER=\${POSTGRES_USER}",
+                "      - POSTGRES_PASSWORD=\${POSTGRES_PASSWORD}",
+                "      - POSTGRES_SERVER=db",
+                "      - POSTGRES_PORT=5432",
+                "      - POSTGRES_DB=\${POSTGRES_DB}",
+                "    networks:",
+                "      - rag-network-${ENVIRONMENT}",
+                "",
+                "  frontend:",
+                "    image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_FRONTEND }}:${ENVIRONMENT}-latest",
+                "    container_name: fullstack-rag-frontend-${ENVIRONMENT}",
+                "    depends_on:",
+                "      - backend",
+                "    ports:",
+                "      - '80:80'",
+                "    networks:",
+                "      - rag-network-${ENVIRONMENT}",
+                "",
+                "volumes:",
+                "  pgdata-${ENVIRONMENT}:",
+                "    driver: local",
+                "",
+                "networks:",
+                "  rag-network-${ENVIRONMENT}:",
+                "    name: rag-network-${ENVIRONMENT}",
+                "    driver: bridge",
+                "EOF",
+                
+                # Create .env file directly on the EC2 instance
+                "echo Creating environment file",
+                "cat << EOF > ~/app/.env.${{ steps.set-env.outputs.ENVIRONMENT }}",
+                "POSTGRES_USER=postgres",
+                "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}",
+                "POSTGRES_DB=postgres-${ENVIRONMENT}",
+                "PROJECT_NAME=${{ secrets.PROJECT_NAME }}",
+                "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}",
+                "OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}",
+                "HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}",
+                "HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}",
+                "EOF",
+
+                # Login to ECR, pull images, and start containers
+                "echo Deploying application",
+                "cd ~/app",
+                "aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
+                "docker compose -f docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml --env-file .env.${{ steps.set-env.outputs.ENVIRONMENT }} pull",
+                "docker compose -f docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml --env-file .env.${{ steps.set-env.outputs.ENVIRONMENT }} up -d"
+            ]}' \
+            --comment "Deployment from GitHub Actions"
         env:
-          ENVIRONMENT: ${{ steps.set-env.outputs.ENVIRONMENT }}
-          IMAGE_TAG: ${{ steps.set-env.outputs.IMAGE_TAG }}
-        run: |
-          cat << EOF > docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml
-          services:
-            db:
-              image: pgvector/pgvector:pg16
-              container_name: fullstack-rag-pgvector-db-${ENVIRONMENT}
-              environment:
-                POSTGRES_USER: \${POSTGRES_USER}
-                POSTGRES_PASSWORD: \${POSTGRES_PASSWORD}
-                POSTGRES_DB: \${POSTGRES_DB}
-              ports:
-                - "5432:5432"
-              volumes:
-                - pgdata-${ENVIRONMENT}:/var/lib/postgresql/data
-              restart: always
-              networks:
-                - rag-network-${ENVIRONMENT}
-              healthcheck:
-                test: ["CMD-SHELL", "pg_isready -U postgres"]
-                interval: 5s
-                timeout: 5s
-                retries: 5
-
-            backend:
-              image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${ENVIRONMENT}-latest
-              container_name: fullstack-rag-backend-${ENVIRONMENT}
-              depends_on:
-                db:
-                  condition: service_healthy
-              restart: always
-              ports:
-                - "8000:8000"
-              environment:
-                - environment=${ENVIRONMENT}
-                - PROJECT_NAME=\${PROJECT_NAME}
-                - OPENAI_API_KEY=\${OPENAI_API_KEY}
-                - OPENAI_MODEL=\${OPENAI_MODEL}
-                - HF_EMBEDDING_MODEL=\${HF_EMBEDDING_MODEL}
-                - HF_EMBEDDER_AUTH_TOKEN=\${HF_EMBEDDER_AUTH_TOKEN}
-                - POSTGRES_USER=\${POSTGRES_USER}
-                - POSTGRES_PASSWORD=\${POSTGRES_PASSWORD}
-                - POSTGRES_SERVER=db
-                - POSTGRES_PORT=5432
-                - POSTGRES_DB=\${POSTGRES_DB}
-              networks:
-                - rag-network-${ENVIRONMENT}
-
-            frontend:
-              image: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_FRONTEND }}:${ENVIRONMENT}-latest
-              container_name: fullstack-rag-frontend-${ENVIRONMENT}
-              depends_on:
-                - backend
-              ports:
-                - "80:80"
-              networks:
-                - rag-network-${ENVIRONMENT}
-
-          volumes:
-            pgdata-${ENVIRONMENT}:
-              driver: local
-
-          networks:
-            rag-network-${ENVIRONMENT}:
-              name: rag-network-${ENVIRONMENT}
-              driver: bridge
-          EOF
-
-      - name: Generate environment .env
-        env:
-          ENVIRONMENT: ${{ steps.set-env.outputs.ENVIRONMENT }}
-        run: |
-          cat << EOF > .env.${{ steps.set-env.outputs.ENVIRONMENT }}
-          POSTGRES_USER=postgres
-          POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-          POSTGRES_DB=postgres-${ENVIRONMENT}
-          PROJECT_NAME=${{ secrets.PROJECT_NAME }}
-          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}
-          HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}
-          HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}
-          EOF
-
-      - name: Start ssh-agent and add SSH key
-        uses: webfactory/ssh-agent@v0.6.0
-        with:
-          ssh-private-key: ${{ secrets.DEV_EC2_SSH_KEY }}
-
-      - name: Copy files to EC2
-        run: |
-          scp -o StrictHostKeyChecking=no \
-              docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml \
-              .env.${{ steps.set-env.outputs.ENVIRONMENT }} \
-              ${{ steps.set-env.outputs.EC2_USERNAME }}@${{ steps.set-env.outputs.EC2_HOST }}:~/app
-
-      - name: Deploy to EC2
-        run: |
-          ssh -o StrictHostKeyChecking=no ${{ steps.set-env.outputs.EC2_USERNAME }}@${{ steps.set-env.outputs.EC2_HOST }} << EOF
-            cd ~/app
-            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
-            docker compose -f docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml --env-file .env.${{ steps.set-env.outputs.ENVIRONMENT }} pull
-            docker compose -f docker-compose.${{ steps.set-env.outputs.ENVIRONMENT }}.yml --env-file .env.${{ steps.set-env.outputs.ENVIRONMENT }} up -d
-          EOF
+          AWS_REGION: ${{ env.AWS_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
