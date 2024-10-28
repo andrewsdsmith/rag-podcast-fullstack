@@ -1,7 +1,7 @@
 services:
   db:
     image: pgvector/pgvector:pg16
-    container_name: fullstack-rag-pgvector-db-${ENVIRONMENT}
+    container_name: db-${ENVIRONMENT}
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -21,7 +21,7 @@ services:
 
   backend:
     image: ${BACKEND_IMAGE}
-    container_name: fullstack-rag-backend-${ENVIRONMENT}
+    container_name: backend-${ENVIRONMENT}
     depends_on:
       db:
         condition: service_healthy
@@ -45,16 +45,34 @@ services:
 
   frontend:
     image: ${FRONTEND_IMAGE}
-    container_name: fullstack-rag-frontend-${ENVIRONMENT}
+    container_name: frontend-${ENVIRONMENT}
     depends_on:
       - backend
     ports:
       - "80:80"
+    volumes:
+      - frontend:/app/dist/frontend/browser
+    networks:
+      - rag-network-${ENVIRONMENT}
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+      - frontend:/usr/share/nginx/html
+    depends_on:
+      - frontend-${ENVIRONMENT}
+      - backend-${ENVIRONMENT}
     networks:
       - rag-network-${ENVIRONMENT}
 
 volumes:
   pgdata-${ENVIRONMENT}:
+    driver: local
+  frontend:
     driver: local
 
 networks:
