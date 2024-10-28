@@ -31,7 +31,7 @@ jobs:
             echo "EC2_INSTANCE_ID=${{ secrets.PROD_EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
           else
-            echo "ENVIRONMENT=development" >> $GITHUB_OUTPUT
+            echo "ENVIRONMENT=staging" >> $GITHUB_OUTPUT
             echo "EC2_INSTANCE_ID=${{ secrets.DEV_EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
             echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
           fi
