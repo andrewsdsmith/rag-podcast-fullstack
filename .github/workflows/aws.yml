@@ -47,22 +47,6 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and push Frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./frontend
-          push: true
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_FRONTEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest
-
-      - name: Build and push Backend image
-        uses: docker/build-push-action@v5
-        with:
-          context: ./backend
-          push: true
-          tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest
-
       - name: Prepare Docker Compose File
         run: |
           FRONTEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_FRONTEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest"
@@ -108,3 +92,18 @@ jobs:
               \"head -n 1 ${{ env.APP_DIR }}/temp/docker-compose.yml\"
             ]}" \
             --output text
+
+      - name: Deploy using SSM
+        run: |
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
+            --parameters "{\"commands\":[
+              \"cd ${{ env.APP_DIR }}\",
+              \"cat > .env << 'EOL'\\nPOSTGRES_USER=postgres\\nPOSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}\\nPOSTGRES_DB=postgres-${{ steps.set-env.outputs.ENVIRONMENT }}\\nPROJECT_NAME=${{ secrets.PROJECT_NAME }}\\nOPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}\\nOPENAI_MODEL=${{ secrets.OPENAI_MODEL }}\\nHF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}\\nHF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}\\nEOL\",
+              \"sudo chown -R ec2-user:docker .\",
+              \"sudo chmod 640 .env\",
+              \"echo 'Deployment completed successfully'\"
+            ]}" \
+            --comment "Deployment from GitHub Actions" \
+            --timeout-seconds 600
