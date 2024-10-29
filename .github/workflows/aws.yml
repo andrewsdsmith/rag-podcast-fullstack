@@ -12,7 +12,7 @@ env:
   AWS_REGION: eu-west-2
   ECR_REPOSITORY_FRONTEND: rag-podcast-fullstack/frontend
   ECR_REPOSITORY_BACKEND: rag-podcast-fullstack/backend
-  APP_DIR: /home/ec2-user/app # Explicit directory path
+  APP_DIR: /home/ec2-user/app
 
 jobs:
   deploy:
@@ -54,56 +54,51 @@ jobs:
           sed "s|\${FRONTEND_IMAGE}|$FRONTEND_IMAGE|g; s|\${BACKEND_IMAGE}|$BACKEND_IMAGE|g; s|\${ENVIRONMENT}|${{ steps.set-env.outputs.ENVIRONMENT }}|g" \
             docker-compose.template.yml > docker-compose.yml
 
-      - name: Copy files to EC2
+      - name: Deploy to EC2
         run: |
-          # Create deployment directories
+          # Create deployment directory and copy files
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
-            --parameters "{\"commands\":[
-              \"mkdir -p ${{ env.APP_DIR }}\",
-              \"mkdir -p ${{ env.APP_DIR }}/temp\",
-              \"chmod 755 ${{ env.APP_DIR }}\",
-              \"chmod 755 ${{ env.APP_DIR }}/temp\"
-            ]}" \
+            --parameters '{
+              "commands": [
+                "mkdir -p ${{ env.APP_DIR }}",
+                "cd ${{ env.APP_DIR }}",
+                
+                # Create env file
+                "cat > .env << \"EOL\"
+                POSTGRES_USER=postgres
+                POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
+                POSTGRES_DB=postgres-${{ steps.set-env.outputs.ENVIRONMENT }}
+                PROJECT_NAME=${{ secrets.PROJECT_NAME }}
+                OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+                OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}
+                HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}
+                HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}
+                EOL",
+
+                # Set proper permissions
+                "sudo chown -R ec2-user:docker .",
+                "sudo chmod 640 .env"
+              ]
+            }' \
+            --comment "Setting up deployment environment" \
             --output text
 
-          # Wait for directory creation
-          sleep 5
+          # Copy docker-compose file directly using AWS S3
+          aws s3 cp docker-compose.yml s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml
 
-          # Encode and transfer docker-compose file
-          DOCKER_COMPOSE_B64=$(base64 -w 0 docker-compose.yml)
-
+          # Download docker-compose and deploy
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
-            --parameters "{\"commands\":[
-              \"echo '${DOCKER_COMPOSE_B64}' | base64 -d > ${{ env.APP_DIR }}/temp/docker-compose.yml\",
-              \"if [ -f ${{ env.APP_DIR }}/temp/docker-compose.yml ]; then echo 'File transfer successful'; else echo 'File transfer failed' >&2; exit 1; fi\"
-            ]}" \
+            --parameters '{
+              "commands": [
+                "cd ${{ env.APP_DIR }}",
+                "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml .",
+                "docker compose pull",
+                "docker compose up -d"
+              ]
+            }' \
+            --comment "Deploying application" \
             --output text
-
-          # Verify file permissions and content
-          aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
-            --parameters "{\"commands\":[
-              \"ls -la ${{ env.APP_DIR }}/temp/docker-compose.yml\",
-              \"head -n 1 ${{ env.APP_DIR }}/temp/docker-compose.yml\"
-            ]}" \
-            --output text
-
-      - name: Deploy using SSM
-        run: |
-          aws ssm send-command \
-            --document-name "AWS-RunShellScript" \
-            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
-            --parameters "{\"commands\":[
-              \"cd ${{ env.APP_DIR }}\",
-              \"cat > .env << 'EOL'\\nPOSTGRES_USER=postgres\\nPOSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}\\nPOSTGRES_DB=postgres-${{ steps.set-env.outputs.ENVIRONMENT }}\\nPROJECT_NAME=${{ secrets.PROJECT_NAME }}\\nOPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}\\nOPENAI_MODEL=${{ secrets.OPENAI_MODEL }}\\nHF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}\\nHF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}\\nEOL\",
-              \"sudo chown -R ec2-user:docker .\",
-              \"sudo chmod 640 .env\",
-              \"echo 'Deployment completed successfully'\"
-            ]}" \
-            --comment "Deployment from GitHub Actions" \
-            --timeout-seconds 600
