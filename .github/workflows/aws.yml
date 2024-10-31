@@ -96,7 +96,7 @@ jobs:
                 "cd ${{ secrets.APP_DIR }}",
                 "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml .",
                 "aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
-                "docker compose pull",
+                "docker compose pull"
               ]
             }' \
             --comment "Downloading docker-compose file and pulling images" \
