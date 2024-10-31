@@ -50,9 +50,7 @@ jobs:
         run: |
           FRONTEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_FRONTEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest"
           BACKEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest"
-          CERTBOT_EMAIL="${{ secrets.CERTBOT_EMAIL }}"
-          DOMAIN_NAME="${{ secrets.DOMAIN_NAME }}"
-          sed "s|\${FRONTEND_IMAGE}|$FRONTEND_IMAGE|g; s|\${BACKEND_IMAGE}|$BACKEND_IMAGE|g; s|\${ENVIRONMENT}|${{ steps.set-env.outputs.ENVIRONMENT }}|g; s|\${CERTBOT_EMAIL}|$CERTBOT_EMAIL|g; s|\${DOMAIN_NAME}|$DOMAIN_NAME|g"
+          sed "s|\${FRONTEND_IMAGE}|$FRONTEND_IMAGE|g; s|\${BACKEND_IMAGE}|$BACKEND_IMAGE|g; s|\${ENVIRONMENT}|${{ steps.set-env.outputs.ENVIRONMENT }}|g; s|\${CERTBOT_EMAIL}|${{secrets.CERTBOT_EMAIL}}|g; s|\${DOMAIN_NAME}|${{secrets.DOMAIN_NAME}}|g" \
             docker-compose.template.yml > docker-compose.yml
 
       - name: Update alembic.ini
