@@ -50,8 +50,14 @@ jobs:
         run: |
           FRONTEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_FRONTEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest"
           BACKEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest"
-          sed "s|\${FRONTEND_IMAGE}|$FRONTEND_IMAGE|g; s|\${BACKEND_IMAGE}|$BACKEND_IMAGE|g; s|\${ENVIRONMENT}|${{ steps.set-env.outputs.ENVIRONMENT }}|g" \
+          CERTBOT_EMAIL="${{ secrets.CERTBOT_EMAIL }}"
+          DOMAIN_NAME="${{ secrets.DOMAIN_NAME }}"
+          sed "s|\${FRONTEND_IMAGE}|$FRONTEND_IMAGE|g; s|\${BACKEND_IMAGE}|$BACKEND_IMAGE|g; s|\${ENVIRONMENT}|${{ steps.set-env.outputs.ENVIRONMENT }}|g; s|\${CERTBOT_EMAIL}|$CERTBOT_EMAIL|g; s|\${DOMAIN_NAME}|$DOMAIN_NAME|g"
             docker-compose.template.yml > docker-compose.yml
+
+      - name: Update alembic.ini
+        run: |
+          sed "s|\${POSTGRES_USER}|${{ secrets.POSTGRES_USER }}|g; s|\${POSTGRES_PASSWORD}|${{ secrets.POSTGRES_PASSWORD }}|g; s|\${POSTGRES_DB}|postgres-${{ steps.set-env.outputs.ENVIRONMENT }}|g" alembic.ini.template > alembic.ini
 
       - name: Deploy to EC2
         run: |
@@ -83,7 +89,7 @@ jobs:
           # Copy docker-compose file directly using AWS S3
           aws s3 cp docker-compose.yml s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml
 
-          # Download docker-compose and deploy
+          # Download docker-compose and pull images
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
@@ -93,8 +99,7 @@ jobs:
                 "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml .",
                 "aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
                 "docker compose pull",
-                "docker compose up -d"
               ]
             }' \
-            --comment "Deploying application" \
+            --comment "Downloading docker-compose file and pulling images" \
             --output text
