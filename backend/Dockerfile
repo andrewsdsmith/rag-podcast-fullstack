@@ -34,6 +34,8 @@ ENV PYTHONPATH=/app
 
 COPY ./scripts /app/scripts
 
+RUN chmod +x /app/scripts/* 
+
 COPY ./pyproject.toml ./uv.lock ./alembic.ini /app/
 
 COPY ./app /app/app
