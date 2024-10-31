@@ -55,7 +55,7 @@ jobs:
 
       - name: Update alembic.ini
         run: |
-          sed "s|\${POSTGRES_USER}|${{ secrets.POSTGRES_USER }}|g; s|\${POSTGRES_PASSWORD}|${{ secrets.POSTGRES_PASSWORD }}|g; s|\${POSTGRES_DB}|postgres-${{ steps.set-env.outputs.ENVIRONMENT }}|g" alembic.ini.template > alembic.ini
+          sed "s|\${POSTGRES_USER}|${{ secrets.POSTGRES_USER }}|g; s|\${POSTGRES_PASSWORD}|${{ secrets.POSTGRES_PASSWORD }}|g; s|\${POSTGRES_DB}|postgres-${{ steps.set-env.outputs.ENVIRONMENT }}|g" alembic.template.ini > alembic.ini
 
       - name: Deploy to EC2
         run: |
