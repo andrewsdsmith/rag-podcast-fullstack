@@ -73,6 +73,11 @@ jobs:
           sed "s|\${FRONTEND_IMAGE}|$FRONTEND_IMAGE|g; s|\${BACKEND_IMAGE}|$BACKEND_IMAGE|g; s|\${ENVIRONMENT}|${{ steps.set-env.outputs.ENVIRONMENT }}|g; s|\${CERTBOT_EMAIL}|${{secrets.CERTBOT_EMAIL}}|g; s|\${DOMAIN_NAME}|${{secrets.DOMAIN_NAME}}|g" \
             docker-compose.template.yml > docker-compose.yml
 
+      - name: Prepare Nginx Configuration
+        run: |
+          sed "s|\${DOMAIN_NAME}|${{ secrets.DOMAIN_NAME }}|g" \
+            nginx.deployment.conf > nginx.conf
+
       - name: Deploy to EC2
         run: |
           # Create deployment directory and copy files
@@ -103,7 +108,10 @@ jobs:
           # Copy docker-compose file directly using AWS S3
           aws s3 cp docker-compose.yml s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml
 
-          # Download docker-compose and pull images
+          # Copy nginx.conf file directly using AWS S3
+          aws s3 cp nginx.conf s3://${{ secrets.DEPLOYMENT_BUCKET }}/nginx.conf
+
+          # Download docker-compose and nginx.conf, and pull images
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
@@ -111,9 +119,11 @@ jobs:
               "commands": [
                 "cd ${{ secrets.APP_DIR }}",
                 "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml .",
+                "mkdir -p nginx-conf",
+                "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/nginx.conf .",
                 "aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
                 "docker compose pull"
               ]
             }' \
-            --comment "Downloading docker-compose file and pulling images" \
+            --comment "Downloading docker-compose and nginx.conf files, and pulling images" \
             --output text
