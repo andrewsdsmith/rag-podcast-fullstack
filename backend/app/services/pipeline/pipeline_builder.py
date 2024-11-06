@@ -2,9 +2,9 @@ from haystack import Pipeline
 from haystack.components.builders import PromptBuilder
 from sqlmodel import Session
 
+from app.core.config import settings
 from app.services.pipeline.postgres_retriever import PostgresRetriever
 from app.services.pipeline.query_embedder import QueryEmbedder
-from app.core.config import settings
 
 
 class PipelineBuilder:

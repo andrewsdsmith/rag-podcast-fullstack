@@ -4,12 +4,12 @@ from typing import Any
 import openai
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
-from starlette.middleware.cors import CORSMiddleware
 from sqlmodel import Session, select
+from starlette.middleware.cors import CORSMiddleware
 
 from app.api.main import api_router
-from app.core.db import engine
 from app.core.config import settings
+from app.core.db import engine
 from app.models.prompt import Prompt
 
 

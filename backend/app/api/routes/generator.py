@@ -9,8 +9,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import TimeoutError
 from sqlmodel import select
 
-from app.core.config import settings
 from app.api.deps import PipelineBuilderDep, SessionDep
+from app.core.config import settings
 from app.models.answer import Answer
 from app.models.question import Question
 from app.models.sse_event import SSEEvent, SSEEventMessage

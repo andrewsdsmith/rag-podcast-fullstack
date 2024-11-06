@@ -1,4 +1,4 @@
-from orjson import orjson
+from orjson import dumps
 from pydantic import BaseModel
 
 
@@ -9,5 +9,5 @@ class SSEEventMessage(BaseModel):
 class SSEEvent(BaseModel):
     data: SSEEventMessage
 
-    def serialize(self):
-        return f"data: {orjson.dumps(self.data.model_dump()).decode()}\n\n"
+    def serialize(self) -> str:
+        return f"data: {dumps(self.data.model_dump()).decode()}\n\n"
