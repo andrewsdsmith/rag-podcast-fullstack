@@ -45,8 +45,8 @@ export class HomeComponent {
       text: 'How does exercise affect mental health?',
     },
     {
-      emoji: '😴',
-      text: 'What role does sleep play in overall health?',
+      emoji: '🍔',
+      text: 'How bad are ulta-processed foods for our health?',
     },
     {
       emoji: '🧠',
