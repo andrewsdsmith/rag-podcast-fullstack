@@ -25,6 +25,7 @@ export class HomeComponent {
   showPopup = true; // Initially, the popup is shown
   showTechStackTooltip = false;
   eventSourceSubscription: Subscription | null = null;
+  showTooltip = false;
 
   // Dynamic example questions
   exampleQuestions: ExampleQuestion[] = [
