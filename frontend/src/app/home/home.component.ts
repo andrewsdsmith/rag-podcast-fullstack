@@ -42,15 +42,15 @@ export class HomeComponent {
     },
     {
       emoji: '🏃',
-      text: 'How does exercise affect mental health?',
+      text: "How do I know if I'm getting enough exercise?",
     },
     {
       emoji: '🍔',
       text: 'How bad are ulta-processed foods for our health?',
     },
     {
-      emoji: '🧠',
-      text: 'How does nutrition affect brain function?',
+      emoji: '🍎',
+      text: 'Why is fiber important and how much should I eat?',
     },
   ];
 
