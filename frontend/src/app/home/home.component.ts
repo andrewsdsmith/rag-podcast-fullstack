@@ -1,12 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { StreamService } from '../services/stream.service';
-import { ConfigService } from '../services/config.service';
+import { StreamService } from '@services/stream.service';
+import { ConfigService } from '@services/config.service';
 import { Subscription } from 'rxjs';
-import { ClickOutsideDirective } from '../directives/click-outside.directive';
+import { ClickOutsideDirective } from '@directives/click-outside.directive';
 import { MarkdownModule } from 'ngx-markdown';
-import { ExampleQuestion } from '../models/example-question';
+import { ExampleQuestion } from '@models/example-question';
 
 @Component({
   selector: 'app-home',

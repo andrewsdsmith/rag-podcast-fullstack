@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
-import { SSEEventMessage } from '../models/sse-event';
+import { SSEEventMessage } from '@models/sse-event';
 
 @Injectable({
   providedIn: 'root',

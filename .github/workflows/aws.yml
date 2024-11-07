@@ -111,6 +111,9 @@ jobs:
           # Copy nginx.conf file directly using AWS S3
           aws s3 cp nginx.conf s3://${{ secrets.DEPLOYMENT_BUCKET }}/nginx.conf
 
+          # Copy options-ssl-nginx.conf file directly using AWS S3
+          aws s3 cp options-ssl-nginx.conf s3://${{ secrets.DEPLOYMENT_BUCKET }}/options-ssl-nginx.conf
+
           # Download docker-compose and nginx.conf, and pull images
           aws ssm send-command \
             --document-name "AWS-RunShellScript" \
@@ -120,7 +123,8 @@ jobs:
                 "cd ${{ secrets.APP_DIR }}",
                 "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml .",
                 "mkdir -p nginx-conf",
-                "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/nginx.conf .",
+                "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/nginx.conf nginx-conf/nginx.conf",
+                "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/options-ssl-nginx.conf nginx-conf/options-ssl-nginx.conf",
                 "aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
                 "docker compose pull"
               ]
