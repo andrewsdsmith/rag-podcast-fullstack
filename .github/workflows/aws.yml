@@ -7,6 +7,12 @@ on:
     tags:
       - "v*-dev"
       - "v*-prod"
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy to (staging or production)"
+        required: true
+        default: "staging"
 
 env:
   AWS_REGION: eu-west-2
@@ -16,6 +22,7 @@ env:
 jobs:
   build-images:
     runs-on: ubuntu-latest
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.environment == 'staging'
 
     steps:
       - name: Checkout code
@@ -67,6 +74,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build-images
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.environment == 'production'
 
     steps:
       - name: Checkout code
