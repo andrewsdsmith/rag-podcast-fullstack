@@ -1,9 +1,6 @@
 name: Build and Push Images
 
 on:
-  push:
-    branches:
-      - chore/aws-actions-deploy
   workflow_dispatch:
     inputs:
       environment:
