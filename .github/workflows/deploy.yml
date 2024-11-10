@@ -1,0 +1,107 @@
+name: Deploy to AWS EC2
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target environment"
+        required: true
+        default: "development"
+env:
+  AWS_REGION: eu-west-2
+  ECR_REPOSITORY_FRONTEND: rag-podcast-fullstack/frontend
+  ECR_REPOSITORY_BACKEND: rag-podcast-fullstack/backend
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set environment variables
+        id: set-env
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          if [[ $TAG == *-prod ]]; then
+            echo "ENVIRONMENT=production" >> $GITHUB_OUTPUT
+            echo "EC2_INSTANCE_ID=${{ secrets.PROD_EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
+            echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
+          else
+            echo "ENVIRONMENT=staging" >> $GITHUB_OUTPUT
+            echo "EC2_INSTANCE_ID=${{ secrets.DEV_EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
+            echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Prepare Docker Compose File
+        run: |
+          FRONTEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_FRONTEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest"
+          BACKEND_IMAGE="${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_BACKEND }}:${{ steps.set-env.outputs.ENVIRONMENT }}-latest"
+          sed "s|\${FRONTEND_IMAGE}|$FRONTEND_IMAGE|g; s|\${BACKEND_IMAGE}|$BACKEND_IMAGE|g; s|\${ENVIRONMENT}|${{ steps.set-env.outputs.ENVIRONMENT }}|g; s|\${CERTBOT_EMAIL}|${{secrets.CERTBOT_EMAIL}}|g; s|\${DOMAIN_NAME}|${{secrets.DOMAIN_NAME}}|g" \
+            docker-compose.template.yml > docker-compose.yml
+
+      - name: Prepare Nginx Configuration
+        run: |
+          sed "s|\${DOMAIN_NAME}|${{ secrets.DOMAIN_NAME }}|g" \
+            nginx.deployment.conf > nginx.conf
+
+      - name: Deploy to EC2
+        run: |
+          # Create deployment directory and copy files
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
+            --parameters '{
+              "commands": [
+                "mkdir -p ${{ secrets.APP_DIR }}",
+                "cd ${{ secrets.APP_DIR }}",
+                "rm -rf *",
+                "echo POSTGRES_USER=${{ secrets.POSTGRES_USER }} >> .env",
+                "echo POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} >> .env",
+                "echo POSTGRES_DB=postgres-${{ steps.set-env.outputs.ENVIRONMENT }} >> .env",
+                "echo PROJECT_NAME=${{ secrets.PROJECT_NAME }} >> .env",
+                "echo OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} >> .env",
+                "echo OPENAI_MODEL=${{ secrets.OPENAI_MODEL }} >> .env",
+                "echo HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }} >> .env",
+                "echo HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }} >> .env",
+                "sudo chown -R ubuntu:docker .",
+                "sudo chmod 640 .env"
+              ]
+            }' \
+            --comment "Setting up deployment environment" \
+            --output text
+
+          # Copy docker-compose file directly using AWS S3
+          aws s3 cp docker-compose.yml s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml
+
+          # Copy nginx.conf file directly using AWS S3
+          aws s3 cp nginx.conf s3://${{ secrets.DEPLOYMENT_BUCKET }}/nginx.conf
+
+          # Copy options-ssl-nginx.conf file directly using AWS S3
+          aws s3 cp options-ssl-nginx.conf s3://${{ secrets.DEPLOYMENT_BUCKET }}/options-ssl-nginx.conf
+
+          # Download docker-compose and nginx.conf, and pull images
+          aws ssm send-command \
+            --document-name "AWS-RunShellScript" \
+            --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
+            --parameters '{
+              "commands": [
+                "cd ${{ secrets.APP_DIR }}",
+                "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml .",
+                "mkdir -p nginx-conf",
+                "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/nginx.conf nginx-conf/nginx.conf",
+                "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/options-ssl-nginx.conf nginx-conf/options-ssl-nginx.conf",
+                "aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
+                "docker compose pull"
+              ]
+            }' \
+            --comment "Downloading docker-compose and nginx.conf files, and pulling images" \
+            --output text
