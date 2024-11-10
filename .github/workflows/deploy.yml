@@ -1,9 +1,6 @@
 name: Deploy to AWS EC2
 
 on:
-  push:
-    branches:
-      - chore/aws-actions-deploy
   workflow_dispatch:
     inputs:
       environment:
