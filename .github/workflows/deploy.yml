@@ -23,16 +23,9 @@ jobs:
       - name: Set environment variables
         id: set-env
         run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          if [[ $TAG == *-prod ]]; then
-            echo "ENVIRONMENT=production" >> $GITHUB_OUTPUT
-            echo "EC2_INSTANCE_ID=${{ secrets.PROD_EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
-            echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
-          else
-            echo "ENVIRONMENT=staging" >> $GITHUB_OUTPUT
-            echo "EC2_INSTANCE_ID=${{ secrets.DEV_EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
-            echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
-          fi
+          echo "ENVIRONMENT=${{ inputs.environment }}" >> $GITHUB_OUTPUT
+          echo "EC2_INSTANCE_ID=${{ secrets.DEV_EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
