@@ -52,61 +52,29 @@ jobs:
 
       - name: Deploy to EC2
         run: |
-          # First command: Setup and verify deployment directory
-          SETUP_RESULT=$(aws ssm send-command \
+          # Create deployment directory and copy files
+          aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
             --parameters '{
               "commands": [
-                "set -e",
-                "echo \"Starting deployment setup at $(date)\"",
-                "if [ ! -d \"${{ secrets.APP_DIR }}\" ]; then mkdir -p \"${{ secrets.APP_DIR }}\"; fi",
-                "cd \"${{ secrets.APP_DIR }}\"",
-                "ls -la",
-                "echo \"Cleaning directory...\"",
+                "mkdir -p ${{ secrets.APP_DIR }}",
+                "cd ${{ secrets.APP_DIR }}",
                 "rm -rf *",
-                "ls -la",
-                "echo \"Creating new .env file...\"",
-                "echo \"POSTGRES_USER=${{ secrets.POSTGRES_USER }}\" > .env",
-                "echo \"POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}\" >> .env",
-                "echo \"POSTGRES_DB=postgres-${{ steps.set-env.outputs.ENVIRONMENT }}\" >> .env",
-                "echo \"PROJECT_NAME=${{ secrets.PROJECT_NAME }}\" >> .env",
-                "echo \"OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}\" >> .env",
-                "echo \"OPENAI_MODEL=${{ secrets.OPENAI_MODEL }}\" >> .env",
-                "echo \"HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }}\" >> .env",
-                "echo \"HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }}\" >> .env",
+                "echo POSTGRES_USER=${{ secrets.POSTGRES_USER }} >> .env",
+                "echo POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }} >> .env",
+                "echo POSTGRES_DB=postgres-${{ steps.set-env.outputs.ENVIRONMENT }} >> .env",
+                "echo PROJECT_NAME=${{ secrets.PROJECT_NAME }} >> .env",
+                "echo OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} >> .env",
+                "echo OPENAI_MODEL=${{ secrets.OPENAI_MODEL }} >> .env",
+                "echo HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }} >> .env",
+                "echo HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }} >> .env",
                 "sudo chown -R ubuntu:docker .",
-                "sudo chmod 640 .env",
-                "cat .env | grep -v -E \"(PASSWORD|KEY|TOKEN)\"",
-                "echo \"Setup completed successfully\""
-              ],
-              "workingDirectory": ["/"],
-              "executionTimeout": ["3600"]
+                "sudo chmod 640 .env"
+              ]
             }' \
-            --output json)
-
-          # Store the command ID
-          COMMAND_ID=$(echo $SETUP_RESULT | jq -r '.Command.CommandId')
-
-          # Wait for command completion and check status
-          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "${{ steps.set-env.outputs.EC2_INSTANCE_ID }}"
-
-          # Get command result
-          RESULT=$(aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" \
-            --instance-id "${{ steps.set-env.outputs.EC2_INSTANCE_ID }}" \
-            --output json)
-
-          # Check status and output
-          STATUS=$(echo $RESULT | jq -r '.Status')
-          if [ "$STATUS" != "Success" ]; then
-            echo "Setup failed with status: $STATUS"
-            echo "Command output:"
-            echo $RESULT | jq -r '.StandardOutputContent'
-            echo "Error output:"
-            echo $RESULT | jq -r '.StandardErrorContent'
-            exit 1
-          fi
+            --comment "Setting up deployment environment" \
+            --output text
 
           # Copy files to S3
           aws s3 cp docker-compose.yml s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml
@@ -114,47 +82,21 @@ jobs:
           aws s3 cp options-ssl-nginx.conf s3://${{ secrets.DEPLOYMENT_BUCKET }}/options-ssl-nginx.conf
           aws s3 cp deploy.sh s3://${{ secrets.DEPLOYMENT_BUCKET }}/deploy.sh
 
-          # Second command: Download and setup Docker
-          DOCKER_SETUP_RESULT=$(aws ssm send-command \
+          # Download docker-compose and nginx.conf, and pull images
+          aws ssm send-command \
             --document-name "AWS-RunShellScript" \
             --targets "[{\"Key\":\"InstanceIds\",\"Values\":[\"${{ steps.set-env.outputs.EC2_INSTANCE_ID }}\"]}]" \
             --parameters '{
               "commands": [
-                "set -e",
-                "echo \"Starting Docker setup at $(date)\"",
-                "cd \"${{ secrets.APP_DIR }}\"",
+                "cd ${{ secrets.APP_DIR }}",
                 "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/docker-compose.yml .",
                 "mkdir -p nginx-conf",
                 "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/nginx.conf nginx-conf/nginx.conf",
                 "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/options-ssl-nginx.conf nginx-conf/options-ssl-nginx.conf",
                 "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/deploy.sh .",
-                "chmod +x deploy.sh",
-                "echo \"Logging into ECR...\"",
                 "aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
-                "echo \"Pulling Docker images...\"",
-                "docker compose pull",
-                "echo \"Docker setup completed successfully\""
-              ],
-              "workingDirectory": ["/"],
-              "executionTimeout": ["3600"]
+                "docker compose pull"
+              ]
             }' \
-            --output json)
-
-          # Wait and verify second command
-          COMMAND_ID=$(echo $DOCKER_SETUP_RESULT | jq -r '.Command.CommandId')
-          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "${{ steps.set-env.outputs.EC2_INSTANCE_ID }}"
-
-          RESULT=$(aws ssm get-command-invocation \
-            --command-id "$COMMAND_ID" \
-            --instance-id "${{ steps.set-env.outputs.EC2_INSTANCE_ID }}" \
-            --output json)
-
-          STATUS=$(echo $RESULT | jq -r '.Status')
-          if [ "$STATUS" != "Success" ]; then
-            echo "Docker setup failed with status: $STATUS"
-            echo "Command output:"
-            echo $RESULT | jq -r '.StandardOutputContent'
-            echo "Error output:"
-            echo $RESULT | jq -r '.StandardErrorContent'
-            exit 1
-          fi
+            --comment "Downloading docker-compose and nginx.conf files, and pulling images" \
+            --output text
