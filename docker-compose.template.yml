@@ -12,7 +12,7 @@ services:
     networks:
       - rag-network-${ENVIRONMENT}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -54,6 +54,7 @@ services:
     container_name: nginx
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx-conf:/etc/nginx/conf.d
       - frontend:/usr/share/nginx/html
