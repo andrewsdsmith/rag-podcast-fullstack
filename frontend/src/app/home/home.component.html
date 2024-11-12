@@ -100,9 +100,7 @@
         <div
           class="flex items-center justify-between mb-4 bg-gray-800 rounded-lg p-3 text-white shadow-md"
         >
-          <span class="text-sm md:text-base font-medium"
-            >Try these curated questions</span
-          >
+          <span class="text-base font-medium">Try these curated questions</span>
 
           <!-- Info icon with tooltip -->
           <div class="relative inline-block">
@@ -112,7 +110,7 @@
               (mouseenter)="showTooltip = true"
               (mouseleave)="showTooltip = false"
             >
-              <img src="info-white.svg" alt="Info Icon" class="w-5 h-5" />
+              <img src="info-white.svg" alt="Info Icon" class="w-6 h-6" />
             </div>
 
             <!-- Tooltip container -->
@@ -153,10 +151,8 @@
               class="flex-shrink-0 w-4/5 sm:w-auto bg-gray-200 hover:bg-gray-300 p-3 rounded-lg shadow transition-all duration-200 active:scale-95 snap-start first:ml-2 last:mr-2 sm:first:ml-0 sm:last:mr-0"
               (click)="populateAndSubmit(question.text)"
             >
-              <span class="text-2xl sm:text-xl mb-1 block">{{
-                question.emoji
-              }}</span>
-              <span class="text-sm sm:text-base">{{ question.text }}</span>
+              <span class="text-2xl mb-1 block">{{ question.emoji }}</span>
+              <span class="text-base">{{ question.text }}</span>
             </button>
           </div>
         </div>
@@ -201,8 +197,7 @@
       class="bg-gray-700 text-white text-center py-2 px-4 mt-6 rounded-b-lg text-sm md:text-base"
     >
       ⚠️ This is a personal portfolio project and not for commercial use.
-      Information is sourced from Zoe Science and Nutrition Podcast. Please do
-      not use this application for medical advice. Thank you!
+      Information is sourced from Zoe Science and Nutrition Podcast.
     </div>
   </div>
 
@@ -223,8 +218,7 @@
         <strong>Zoe Science and Nutrition Podcast</strong>. I enjoy listening to
         the podcast and I wanted to implement a RAG application to showcase my
         skills. The podcast transcripts have been summarised and paraphrased for
-        this project. Please do not use this application for medical advice.
-        Thank you!
+        this project.
       </p>
       <button
         (click)="closePopup()"
