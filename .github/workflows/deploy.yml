@@ -25,7 +25,6 @@ jobs:
         run: |
           echo "ENVIRONMENT=${{ inputs.environment }}" >> $GITHUB_OUTPUT
           echo "EC2_INSTANCE_ID=${{ secrets.DEV_EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
-          echo "IMAGE_TAG=${TAG}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
