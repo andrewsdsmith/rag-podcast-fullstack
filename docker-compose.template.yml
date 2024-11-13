@@ -1,0 +1,90 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: db-${ENVIRONMENT}
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata-${ENVIRONMENT}:/var/lib/postgresql/data
+    restart: always
+    networks:
+      - rag-network-${ENVIRONMENT}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+
+  backend:
+    image: ${BACKEND_IMAGE}
+    container_name: backend-${ENVIRONMENT}
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: always
+    environment:
+      environment: ${ENVIRONMENT}
+      PROJECT_NAME: ${PROJECT_NAME}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL}
+      HF_EMBEDDING_MODEL: ${HF_EMBEDDING_MODEL}
+      HF_EMBEDDER_AUTH_TOKEN: ${HF_EMBEDDER_AUTH_TOKEN}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_SERVER: db
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ${POSTGRES_DB}
+    networks:
+      - rag-network-${ENVIRONMENT}
+
+  frontend:
+    image: ${FRONTEND_IMAGE}
+    container_name: frontend-${ENVIRONMENT}
+    depends_on:
+      - backend
+    volumes:
+      - frontend:/app/dist/frontend/browser
+    networks:
+      - rag-network-${ENVIRONMENT}
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-conf:/etc/nginx/conf.d
+      - frontend:/usr/share/nginx/html
+      - certbot-etc:/etc/letsencrypt
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - rag-network-${ENVIRONMENT}
+
+  certbot:
+    depends_on:
+      - nginx
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - certbot-etc:/etc/letsencrypt
+      - frontend:/usr/share/nginx/html
+    command: certonly --webroot --webroot-path=/usr/share/nginx/html --email ${CERTBOT_EMAIL} --agree-tos --no-eff-email --force-renewal -d ${DOMAIN_NAME}
+
+volumes:
+  pgdata-${ENVIRONMENT}:
+    driver: local
+  frontend:
+    driver: local
+  certbot-etc:
+    driver: local
+
+networks:
+  rag-network-${ENVIRONMENT}:
+    name: rag-network-${ENVIRONMENT}
+    driver: bridge

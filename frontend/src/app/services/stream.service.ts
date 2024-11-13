@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import { SSEEventMessage } from '@models/sse-event';
 
 @Injectable({
   providedIn: 'root',
@@ -12,11 +13,15 @@ export class StreamService {
       const eventSource = new EventSource(url);
 
       eventSource.onmessage = (event) => {
-        if (event.data === '[DONE]') {
+        const data = JSON.parse(event.data) as SSEEventMessage;
+
+        if (data.message === '[DONE]') {
           observer.complete();
           eventSource.close();
         } else {
-          observer.next(event.data);
+          // Find newline characters and replace them with <br> tags
+          const messageContent = data.message.replace(/\n/g, '<br>');
+          observer.next(messageContent);
         }
       };
 

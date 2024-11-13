@@ -1,4 +1,4 @@
-FROM python:3.11
+FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1
 
@@ -33,6 +33,8 @@ RUN apt-get update && apt-get install -y postgresql-client
 ENV PYTHONPATH=/app
 
 COPY ./scripts /app/scripts
+
+RUN chmod +x /app/scripts/* 
 
 COPY ./pyproject.toml ./uv.lock ./alembic.ini /app/
 

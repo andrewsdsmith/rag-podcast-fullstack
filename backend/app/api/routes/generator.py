@@ -10,8 +10,10 @@ from sqlalchemy.exc import TimeoutError
 from sqlmodel import select
 
 from app.api.deps import PipelineBuilderDep, SessionDep
+from app.core.config import settings
 from app.models.answer import Answer
 from app.models.question import Question
+from app.models.sse_event import SSEEvent, SSEEventMessage
 
 router = APIRouter()
 
@@ -78,10 +80,11 @@ async def question_answer(
         if cached_answer:
 
             async def db_response_generator() -> AsyncGenerator[str, None]:
-                for char in cached_answer.text:
-                    yield f"data: {char}\n\n"
-                    await asyncio.sleep(0.01)
-                yield "data: [DONE]\n\n"
+                for chunk in cached_answer.text.split("<!--CHUNK-->"):
+                    event = SSEEvent(data=SSEEventMessage(message=chunk))
+                    yield event.serialize()
+                    await asyncio.sleep(0.005)
+                yield SSEEvent(data=SSEEventMessage(message="[DONE]")).serialize()
 
             return StreamingResponse(
                 db_response_generator(), media_type="text/event-stream"
@@ -104,19 +107,22 @@ async def question_answer(
             full_response = ""
             try:
                 response = openai.chat.completions.create(
-                    model="gpt-4",
-                    messages=[{"role": "system", "content": prompt_text}],
+                    model=settings.OPENAI_MODEL,
+                    messages=[{"role": "assistant", "content": prompt_text}],
                     stream=True,
                 )
 
                 for chunk in response:
                     if chunk.choices[0].delta.content is not None:
                         data = chunk.choices[0].delta.content
-                        full_response += data
-                        yield f"data: {data}\n\n"
+                        serialised_event = SSEEvent(
+                            data=SSEEventMessage(message=data)
+                        ).serialize()
+                        full_response += data + "<!--CHUNK-->"
+                        yield serialised_event
                         await asyncio.sleep(0)
 
-                yield "data: [DONE]\n\n"
+                yield SSEEvent(data=SSEEventMessage(message="[DONE]")).serialize()
 
                 # Save response in background
                 await save_response(text, full_response, session)

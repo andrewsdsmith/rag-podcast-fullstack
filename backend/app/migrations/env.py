@@ -13,6 +13,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# Import all models to ensure Alembic detects them
+from app.models.answer import Answer
+from app.models.question import Question
+from app.models.podcast_segment_summary import PodcastSegmentSummary
+from app.models.prompt import Prompt
 
 # add your model's MetaData object here
 # for 'autogenerate' support

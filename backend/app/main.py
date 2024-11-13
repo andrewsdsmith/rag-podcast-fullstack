@@ -4,10 +4,13 @@ from typing import Any
 import openai
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
+from sqlmodel import Session, select
 from starlette.middleware.cors import CORSMiddleware
 
 from app.api.main import api_router
 from app.core.config import settings
+from app.core.db import engine
+from app.models.prompt import Prompt
 
 
 def custom_generate_unique_id(route: APIRoute) -> str:
@@ -17,6 +20,19 @@ def custom_generate_unique_id(route: APIRoute) -> str:
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> Any:
     openai.api_key = settings.OPENAI_API_KEY
+
+    # Check the version in the prompt table and update if necessary
+    with Session(engine) as session:
+        prompt = session.exec(
+            select(Prompt).where(Prompt.api_version == settings.API_FULL_VERSION)
+        ).first()
+        if not prompt:
+            # Create a new prompt
+            prompt = Prompt(
+                api_version=settings.API_FULL_VERSION, text=settings.PROMPT_TEMPLATE
+            )
+            session.add(prompt)
+            session.commit()
     yield
 
 
@@ -29,7 +45,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

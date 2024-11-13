@@ -1,8 +1,0 @@
-.env
-*.pyc
-__pycache__
-*.sql
-.cache
-.venv
-.mypy_cache
-.ruff_cache
