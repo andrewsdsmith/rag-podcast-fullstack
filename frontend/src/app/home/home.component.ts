@@ -30,8 +30,8 @@ export class HomeComponent {
   // Dynamic example questions
   exampleQuestions: ExampleQuestion[] = [
     {
-      emoji: '🥗',
-      text: 'What is intermittent fasting?',
+      emoji: '🍎',
+      text: 'Why is fiber important and how much should I eat?',
     },
     {
       emoji: '🦠',
@@ -50,8 +50,8 @@ export class HomeComponent {
       text: 'How bad are ulta-processed foods for our health?',
     },
     {
-      emoji: '🍎',
-      text: 'Why is fiber important and how much should I eat?',
+      emoji: '🥟',
+      text: 'How much dumplings is too much?',
     },
   ];
 
