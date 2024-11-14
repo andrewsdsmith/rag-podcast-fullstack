@@ -51,8 +51,11 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
 
     # Hugging Face Model - Embedder
-    HF_EMBEDDING_MODEL: str
-    HF_EMBEDDER_AUTH_TOKEN: str = ""
+    # HF_EMBEDDING_MODEL: str
+    # HF_EMBEDDER_AUTH_TOKEN: str = ""
+
+    # Jina Model - Embedder
+    JINA_EMBEDDER_MODEL: str
 
     # Postgres Database
     POSTGRES_SERVER: str

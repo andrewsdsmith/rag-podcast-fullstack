@@ -24,7 +24,7 @@ jobs:
         id: set-env
         run: |
           echo "ENVIRONMENT=${{ inputs.environment }}" >> $GITHUB_OUTPUT
-          echo "EC2_INSTANCE_ID=${{ secrets.DEV_EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
+          echo "EC2_INSTANCE_ID=${{ secrets.EC2_INSTANCE_ID }}" >> $GITHUB_OUTPUT
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -66,8 +66,8 @@ jobs:
                 "echo PROJECT_NAME=${{ secrets.PROJECT_NAME }} >> .env",
                 "echo OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} >> .env",
                 "echo OPENAI_MODEL=${{ secrets.OPENAI_MODEL }} >> .env",
-                "echo HF_EMBEDDING_MODEL=${{ secrets.HF_EMBEDDING_MODEL }} >> .env",
-                "echo HF_EMBEDDER_AUTH_TOKEN=${{ secrets.HF_EMBEDDER_AUTH_TOKEN }} >> .env",
+                "echo JINA_EMBEDDER_MODEL=${{ secrets.JINA_EMBEDDER_MODEL }} >> .env",
+                "echo JINA_API_KEY=${{ secrets.JINA_API_KEY }} >> .env",
                 "sudo chown -R ubuntu:docker .",
                 "sudo chmod 640 .env"
               ]

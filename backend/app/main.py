@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from sqlmodel import Session, select
 from starlette.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
 
 from app.api.main import api_router
 from app.core.config import settings
@@ -19,7 +20,11 @@ def custom_generate_unique_id(route: APIRoute) -> str:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> Any:
+    # Load the OpenAI API key from the environment
     openai.api_key = settings.OPENAI_API_KEY
+
+    # Load the environment variables from the .env file
+    load_dotenv()
 
     # Check the version in the prompt table and update if necessary
     with Session(engine) as session:
