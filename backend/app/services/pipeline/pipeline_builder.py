@@ -4,7 +4,7 @@ from sqlmodel import Session
 
 from app.core.config import settings
 from app.services.pipeline.postgres_retriever import PostgresRetriever
-from app.services.pipeline.query_embedder import QueryEmbedder
+from app.services.pipeline.jina_query_embedder import JinaQueryEmbedder
 
 
 class PipelineBuilder:
@@ -12,7 +12,7 @@ class PipelineBuilder:
         self.prompt_template = settings.PROMPT_TEMPLATE
 
     def build(self, session: Session) -> Pipeline:
-        query_embedder = QueryEmbedder()
+        query_embedder = JinaQueryEmbedder()
         postgres_retriever = PostgresRetriever(session=session)
         prompt_builder = PromptBuilder(template=self.prompt_template)
         pipeline = Pipeline()

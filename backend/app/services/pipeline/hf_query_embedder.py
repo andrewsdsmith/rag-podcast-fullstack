@@ -5,7 +5,7 @@ from app.core.config import settings
 
 
 @component
-class QueryEmbedder:
+class HuggingFaceQueryEmbedder:
     def __init__(self) -> None:
         self.model = SentenceTransformer(
             settings.HF_EMBEDDING_MODEL, trust_remote_code=True
