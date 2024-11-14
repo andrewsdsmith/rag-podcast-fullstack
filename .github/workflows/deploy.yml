@@ -94,7 +94,7 @@ jobs:
                 "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/options-ssl-nginx.conf nginx-conf/options-ssl-nginx.conf",
                 "aws s3 cp s3://${{ secrets.DEPLOYMENT_BUCKET }}/deploy.sh .",
                 "aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}",
-                "docker compose pull",
+                "docker compose pull"
               ]
             }' \
             --comment "Downloading docker-compose and nginx.conf files, and pulling images" \
