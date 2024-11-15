@@ -51,7 +51,7 @@ export class HomeComponent {
     },
     {
       emoji: '🍬',
-      text: 'Are there risks associated with eating too much sugar?',
+      text: 'Are there risks associated with eating a lot of sugar?',
     },
   ];
 
