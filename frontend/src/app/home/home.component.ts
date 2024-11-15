@@ -34,12 +34,12 @@ export class HomeComponent {
       text: 'Why is fiber important and how much should I eat?',
     },
     {
-      emoji: '🦠',
-      text: 'What is a gut microbiome?',
-    },
-    {
       emoji: '🌱',
       text: 'What are the benefits of a plant-based diet?',
+    },
+    {
+      emoji: '🦠',
+      text: 'Why is the gut microbiome so important?',
     },
     {
       emoji: '🏃',
@@ -50,8 +50,8 @@ export class HomeComponent {
       text: 'How bad are ulta-processed foods for our health?',
     },
     {
-      emoji: '🥟',
-      text: 'How much dumplings is too much?',
+      emoji: '🍬',
+      text: 'Are there risks associated with eating a lot of sugar?',
     },
   ];
 
