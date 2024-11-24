@@ -3,8 +3,8 @@ from haystack.components.builders import PromptBuilder
 from sqlmodel import Session
 
 from app.core.config import settings
-from app.services.pipeline.postgres_retriever import PostgresRetriever
 from app.services.pipeline.jina_query_embedder import JinaQueryEmbedder
+from app.services.pipeline.postgres_retriever import PostgresRetriever
 
 
 class PipelineBuilder:

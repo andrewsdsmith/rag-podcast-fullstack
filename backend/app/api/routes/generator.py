@@ -1,71 +1,20 @@
 import asyncio
 import logging
-from collections.abc import AsyncGenerator, Generator
-from contextlib import contextmanager
+from collections.abc import AsyncGenerator
+
 
 import openai
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import TimeoutError
-from sqlmodel import select
+import logging
 
+from app.services import cache, openai
 from app.api.deps import PipelineBuilderDep, SessionDep
-from app.core.config import settings
-from app.models.answer import Answer
-from app.models.question import Question
 from app.models.sse_event import SSEEvent, SSEEventMessage
 
 router = APIRouter()
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-@contextmanager
-def session_scope(session: SessionDep) -> Generator[SessionDep, None, None]:
-    """Provide a transactional scope around a series of operations."""
-    try:
-        yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
-async def get_cached_response(text: str, session: SessionDep) -> Answer | None:
-    """Check for cached response in the database."""
-    try:
-        # Use SQLModel's select syntax
-        stmt = select(Question).where(Question.text == text)
-        exact_matches = session.exec(stmt).all()
-
-        if exact_matches:
-            # Get the most recent match
-            exact_match = max(exact_matches, key=lambda q: q.created_at)
-            answer_stmt = select(Answer).where(Answer.id == exact_match.answer_id)
-            return session.exec(answer_stmt).first()
-    except Exception as e:
-        logger.error(f"Error checking cache: {e}", exc_info=True)
-    return None
-
-
-async def save_response(text: str, answer_text: str, session: SessionDep) -> None:
-    """Save the response to the database."""
-    try:
-        with session_scope(session):
-            answer = Answer(text=answer_text)
-            session.add(answer)
-            session.flush()  # Flush to get the answer ID
-
-            question_model = Question(text=text, answer_id=answer.id)
-            session.add(question_model)
-    except Exception as e:
-        logger.error(f"Error saving response: {e}", exc_info=True)
-        # Continue without failing - we don't want to interrupt the response stream
-        # if saving fails
 
 
 @router.get("/question")
@@ -75,22 +24,20 @@ async def question_answer(
     try:
         text = text.strip()
 
-        # Check cache first
-        cached_answer = await get_cached_response(text, session)
+        # Check cache
+        cached_answer = await cache.get_cached_response(text, session)
         if cached_answer:
 
-            async def db_response_generator() -> AsyncGenerator[str, None]:
+            async def stream_cached() -> AsyncGenerator[str, None]:
                 for chunk in cached_answer.text.split("<!--CHUNK-->"):
                     event = SSEEvent(data=SSEEventMessage(message=chunk))
                     yield event.serialize()
                     await asyncio.sleep(0.005)
                 yield SSEEvent(data=SSEEventMessage(message="[DONE]")).serialize()
 
-            return StreamingResponse(
-                db_response_generator(), media_type="text/event-stream"
-            )
+            return StreamingResponse(stream_cached(), media_type="text/event-stream")
 
-        # Process new question
+        # Generate augmented prompt
         ra_pipeline = pipeline.build(session=session)
         augmented_prompt = ra_pipeline.run(
             {
@@ -99,33 +46,20 @@ async def question_answer(
                 "prompt": {"query": text},
             }
         )
-
         prompt_text = augmented_prompt["prompt"]["prompt"]
-        logger.info(f"Generated prompt: {prompt_text[:200]}...")  # Log truncated prompt
+        logger.info(f"Generated prompt: {prompt_text[:200]}...")
 
-        async def response_generator() -> AsyncGenerator[str, None]:
-            full_response = ""
+        async def stream_response() -> AsyncGenerator[str, None]:
             try:
-                response = openai.chat.completions.create(
-                    model=settings.OPENAI_MODEL,
-                    messages=[{"role": "assistant", "content": prompt_text}],
-                    stream=True,
-                )
+                async for content, full_response in openai.stream_completion(
+                    prompt_text
+                ):
+                    yield SSEEvent(data=SSEEventMessage(message=content)).serialize()
+                    await asyncio.sleep(0)
 
-                for chunk in response:
-                    if chunk.choices[0].delta.content is not None:
-                        data = chunk.choices[0].delta.content
-                        serialised_event = SSEEvent(
-                            data=SSEEventMessage(message=data)
-                        ).serialize()
-                        full_response += data + "<!--CHUNK-->"
-                        yield serialised_event
-                        await asyncio.sleep(0)
-
+                # Save final response
+                await cache.save_response(text, full_response, session)
                 yield SSEEvent(data=SSEEventMessage(message="[DONE]")).serialize()
-
-                # Save response in background
-                await save_response(text, full_response, session)
 
             except Exception as e:
                 logger.error(f"Error in stream generation: {e}", exc_info=True)
@@ -133,7 +67,7 @@ async def question_answer(
                 yield "data: [DONE]\n\n"
 
         return StreamingResponse(
-            response_generator(),
+            stream_response(),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache"},
         )
