@@ -1,7 +1,7 @@
 from typing import Optional
 
-from sqlmodel import Field, Relationship, SQLModel
 from sqlalchemy import Column, Text
+from sqlmodel import Field, Relationship, SQLModel
 
 
 class Answer(SQLModel, table=True):

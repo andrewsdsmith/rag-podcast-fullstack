@@ -2,11 +2,11 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import openai
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
 from sqlmodel import Session, select
 from starlette.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
 
 from app.api.main import api_router
 from app.core.config import settings
