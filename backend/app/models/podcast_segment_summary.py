@@ -3,7 +3,7 @@ from sqlalchemy import Column
 from sqlmodel import Field, SQLModel
 
 
-class PodcastSegmentSummary(SQLModel, table=True):
+class PodcastSegmentSummary(SQLModel, table=True):  # type: ignore[call-arg]
     __tablename__ = "podcast_segment_summaries"
 
     id: int = Field(default=None, primary_key=True)

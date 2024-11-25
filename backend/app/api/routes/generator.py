@@ -2,16 +2,14 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator
 
-
 import openai
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.exc import TimeoutError
-import logging
 
-from app.services import cache, openai
 from app.api.deps import PipelineBuilderDep, SessionDep
 from app.models.sse_event import SSEEvent, SSEEventMessage
+from app.services import cache
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -51,9 +49,10 @@ async def question_answer(
 
         async def stream_response() -> AsyncGenerator[str, None]:
             try:
-                async for content, full_response in openai.stream_completion(
-                    prompt_text
-                ):
+                async for (
+                    content,
+                    full_response,  # noqa: B007
+                ) in openai.stream_completion(prompt_text):
                     yield SSEEvent(data=SSEEventMessage(message=content)).serialize()
                     await asyncio.sleep(0)
 

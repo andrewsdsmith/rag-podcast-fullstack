@@ -9,9 +9,6 @@ python app/backend_pre_start.py
 # Run migrations
 alembic upgrade head
 
-# Create initial data in DB
-python app/initial_data.py
-
 # Seed the DB using sql dump
 # Reference db container by hostname. Include password in env variable
 

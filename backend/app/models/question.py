@@ -9,7 +9,7 @@ class QuestionBase(SQLModel):
     text: str = Field(max_length=2500)
 
 
-class Question(QuestionBase, table=True):
+class Question(QuestionBase, table=True):  # type: ignore[call-arg]
     id: int = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 

@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 from sqlmodel import Field, SQLModel
 
 
-class Prompt(SQLModel, table=True):
+class Prompt(SQLModel, table=True):  # type: ignore[call-arg]
     """The prompt template for the pipeline generator model."""
 
     __tablename__ = "prompts"

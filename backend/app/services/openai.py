@@ -1,12 +1,14 @@
-from typing import AsyncGenerator, Tuple
-import openai
 import logging
+from collections.abc import AsyncGenerator
+
+import openai
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
-async def stream_completion(prompt_text: str) -> AsyncGenerator[Tuple[str, str], None]:
+async def stream_completion(prompt_text: str) -> AsyncGenerator[tuple[str, str], None]:
     """Stream completion from OpenAI API."""
     try:
         response = openai.chat.completions.create(
