@@ -7,6 +7,7 @@ import { Subscription } from 'rxjs';
 import { ClickOutsideDirective } from '@directives/click-outside.directive';
 import { MarkdownModule } from 'ngx-markdown';
 import { ExampleQuestion } from '@models/example-question';
+import { QuestionRequest } from '@models/question-request';
 
 @Component({
   selector: 'app-home',
@@ -17,12 +18,12 @@ import { ExampleQuestion } from '@models/example-question';
 })
 export class HomeComponent {
   userQuestion = '';
-  answer = signal(''); // Raw markdown
+  answer = signal('');
   isLoading = signal(false);
-  error = signal(false); // Tracks if an error occurred
-  errorMessage = signal(''); // Stores the error message
+  error = signal(false);
+  errorMessage = signal('');
   apiUrl = this.configService.getConfig().apiUrl;
-  showPopup = true; // Initially, the popup is shown
+  showPopup = true;
   showTechStackTooltip = false;
   eventSourceSubscription: Subscription | null = null;
   showTooltip = false;
@@ -65,15 +66,14 @@ export class HomeComponent {
 
     this.resetState();
 
-    const url = `${this.apiUrl}/generator/question?text=${encodeURIComponent(
-      this.userQuestion
-    )}`;
+    const url = `${this.apiUrl}/generator/question`;
+    const body = { text: this.userQuestion } as QuestionRequest;
     this.eventSourceSubscription = this.streamService
-      .connectToServerSentEvents(url)
+      .connectToServerSentEvents(url, body)
       .subscribe({
         next: (data: string) => {
-          this.error.set(false); // Reset error state on successful data
-          this.answer.update((current) => current + data); // Append incoming markdown data
+          this.error.set(false);
+          this.answer.update((current) => current + data);
         },
         complete: () => {
           this.isLoading.set(false);
@@ -81,7 +81,7 @@ export class HomeComponent {
         error: (err) => {
           console.error('Error in stream:', err);
           this.isLoading.set(false);
-          this.error.set(true); // Set error state
+          this.error.set(true);
           this.errorMessage.set(this.getErrorMessage(err));
         },
       });
@@ -93,12 +93,12 @@ export class HomeComponent {
     }
     this.answer.set('');
     this.isLoading.set(true);
-    this.error.set(false); // Reset error state
-    this.errorMessage.set(''); // Clear any previous error messages
+    this.error.set(false);
+    this.errorMessage.set('');
   }
 
   retrySubmit() {
-    this.submitQuestion(); // Re-attempt to submit the question
+    this.submitQuestion();
   }
 
   getErrorMessage(err: any): string {
