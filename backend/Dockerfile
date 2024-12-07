@@ -41,8 +41,10 @@ COPY ./pyproject.toml ./uv.lock ./alembic.ini /app/
 COPY ./app /app/app
 
 # Sync the project
-# Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync
+
+# Use an entrypoint script to run prestart.sh before the main command
+ENTRYPOINT ["/app/scripts/prestart.sh"]
 
 CMD ["fastapi", "run", "--workers", "4", "app/main.py"]

@@ -2,14 +2,14 @@ import logging
 
 from sqlmodel import select
 
-from app.api.deps import SessionDep
+from app.api.deps import DbSession
 from app.models.answer import Answer
 from app.models.question import Question
 
 logger = logging.getLogger(__name__)
 
 
-async def get_cached_response(text: str, session: SessionDep) -> Answer | None:
+async def get_cached_response(text: str, session: DbSession) -> Answer | None:
     """Get cached response from the database."""
     try:
         stmt = select(Question).where(Question.text == text)
@@ -26,7 +26,7 @@ async def get_cached_response(text: str, session: SessionDep) -> Answer | None:
         return None
 
 
-async def save_response(text: str, answer_text: str, session: SessionDep) -> None:
+async def save_response(text: str, answer_text: str, session: DbSession) -> None:
     """Save response to the database."""
     try:
         answer = Answer(text=answer_text)

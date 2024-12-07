@@ -93,6 +93,7 @@ dev-dependencies = [
     "mypy>=1.12.1",
     "pre-commit>=4.0.1",
     "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
     "pytest>=8.3.3",
     "ruff>=0.7.0",
     "types-passlib>=1.7.7.20240819",
@@ -123,6 +124,7 @@ ignore = [
     "B008",  # do not perform function calls in argument defaults
     "W191",  # indentation contains tabs
     "B904",  # Allow raising exceptions without from e, for HTTPException
+    "W293",  # ignore whitespace in blank lines (especially in multiline strings)
 ]
 
 [tool.ruff.lint.pyupgrade]

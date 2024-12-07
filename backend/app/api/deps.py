@@ -13,7 +13,7 @@ def get_session() -> Generator[Session, None, None]:
         yield session
 
 
-SessionDep = Annotated[Session, Depends(get_session)]
+DbSession = Annotated[Session, Depends(get_session)]
 
 
 def get_pipeline_builder() -> PipelineBuilder:
