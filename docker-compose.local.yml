@@ -2,6 +2,11 @@ services:
   db:
     image: pgvector/pgvector:pg16
     container_name: db
+    # The production system is closed within the docker network but when running locally
+    # we need to expose the port to the host machine if we want to access
+    # the DB via azure data studio or other tools
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -12,7 +17,8 @@ services:
     networks:
       - rag-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test:
+        ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
