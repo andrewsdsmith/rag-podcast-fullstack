@@ -37,7 +37,8 @@ services:
       - --reload
       - "app/main.py"
     environment:
-      environment: ${ENVIRONMENT}
+      ENVIRONMENT: ${ENVIRONMENT}
+      FRONTEND_HOST: ${FRONTEND_HOST}
       PROJECT_NAME: ${PROJECT_NAME}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
       OPENAI_MODEL: ${OPENAI_MODEL}
