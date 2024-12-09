@@ -1,25 +1,49 @@
+# This workflow will run unit tests for the current project
+
 name: Code Quality
 
-on: [push, pull_request]
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch: # Allows triggering the workflow manually in GitHub UI
+
+# If another push to the same PR or branch happens while this workflow is still running,
+# cancel the earlier run in favor of the next run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality:
+    name: Quality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v2
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v2
         with:
-          python-version: "3.11"
-
+          python-version: 3.11
       - name: Install dependencies
         run: |
-          pip install uv
-          uv pip install -e ".[dev]"
-
-      - name: Run linting
-        run: uv run lint
-
-      - name: Run formatting check
-        run: ruff format app --check
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          uv venv
+          uv pip install -r pyproject.toml
+      - name: Lint with ruff
+        run: |
+          uv pip install ruff
+          uv run ruff check .
+      - name: Lint with mypy
+        run: |
+          uv pip install mypy
+          uv run mypy --strict src/
+      - name: Check README spelling
+        uses: codespell-project/actions-codespell@v2
+        with:
+          ignore_words_file: .codespellignore
+          path: README.md
+      - name: Check code spelling
+        uses: codespell-project/actions-codespell@v2
+        with:
+          ignore_words_file: .codespellignore
+          path: src/
