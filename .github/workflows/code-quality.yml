@@ -20,6 +20,8 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: 3.11
+      - name: CD into Backend
+        run: cd ./backend
       - name: Install dependencies
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
