@@ -67,7 +67,7 @@ async def question_answer(
         User Question:
         
         {user_question}
-        """
+        """  # noqa: W293
 
         async def stream_response() -> AsyncGenerator[str, None]:
             try:
