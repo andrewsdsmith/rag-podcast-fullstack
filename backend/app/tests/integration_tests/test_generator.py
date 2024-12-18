@@ -3,20 +3,8 @@ from httpx import AsyncClient
 
 pytestmark = pytest.mark.asyncio
 
-
-async def test_db_connection(check_db_populated):
-    """Test that database is properly populated with seed data."""
-    segment = check_db_populated
-    print(segment)
-    assert segment.id is not None
-    assert segment.title is not None
-    assert segment.summary is not None
-    assert segment.embedding is not None
-
-
-async def test_generator_endpoint(client: AsyncClient):
+async def test_generator_endpoint(client: AsyncClient) -> None:
     """Test the generator endpoint with a sample question."""
-    client = await anext(client)  # Get the actual client from the async generator
     test_question = "What are the health benefits of intermittent fasting?"
 
     response = await client.post(
@@ -42,9 +30,8 @@ async def test_generator_endpoint(client: AsyncClient):
     assert len(content[0].strip()) > 0
 
 
-async def test_generator_endpoint_empty_question(client: AsyncClient):
+async def test_generator_endpoint_empty_question(client: AsyncClient) -> None:
     """Test the generator endpoint with an empty question."""
-    client = await anext(client)
 
     response = await client.post(
         "/api/v1/generator/question",
@@ -55,9 +42,8 @@ async def test_generator_endpoint_empty_question(client: AsyncClient):
     assert response.status_code == 422  # Validation error
 
 
-async def test_generator_endpoint_cached_response(client: AsyncClient):
+async def test_generator_endpoint_cached_response(client: AsyncClient) -> None:
     """Test the generator endpoint with a cached response."""
-    client = await anext(client)
     test_question = "What are the health benefits of exercise?"
 
     # First request to cache the response

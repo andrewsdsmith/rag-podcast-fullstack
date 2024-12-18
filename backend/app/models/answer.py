@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from app.models.question import Question  # Import only for type checking
 
 
-class Answer(SQLModel, table=True):  # type: ignore[call-arg]
+class Answer(SQLModel, table=True):
     """Answer model for the database."""
 
     id: int = Field(default=None, primary_key=True)

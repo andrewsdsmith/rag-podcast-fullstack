@@ -9,7 +9,7 @@ class QuestionBase(SQLModel):
     text: str = Field(max_length=2500)
 
 
-class Question(QuestionBase, table=True):  # type: ignore[call-arg]
+class Question(QuestionBase, table=True):
     """Question model for the database."""
 
     id: int = Field(default=None, primary_key=True)
