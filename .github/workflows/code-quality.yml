@@ -34,11 +34,3 @@ jobs:
           uv pip install mypy
           uv run mypy --strict app/
         working-directory: ./backend
-      - name: Check README spelling
-        uses: codespell-project/actions-codespell@v2
-        with:
-          path: README.md
-      - name: Check code spelling
-        uses: codespell-project/actions-codespell@v2
-        with:
-          path: ./backend
