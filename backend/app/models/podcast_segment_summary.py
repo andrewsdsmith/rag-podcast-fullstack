@@ -4,6 +4,8 @@ from sqlmodel import Field, SQLModel
 
 
 class PodcastSegmentSummary(SQLModel, table=True):
+    """Podcast segment summary model for the database."""
+
     __tablename__ = "podcast_segment_summaries"
 
     id: int = Field(default=None, primary_key=True)

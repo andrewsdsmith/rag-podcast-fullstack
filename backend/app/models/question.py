@@ -10,6 +10,8 @@ class QuestionBase(SQLModel):
 
 
 class Question(QuestionBase, table=True):
+    """Question model for the database."""
+
     id: int = Field(default=None, primary_key=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
