@@ -15,14 +15,11 @@ def anyio_backend() -> str:
     return "asyncio"
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 async def client() -> AsyncGenerator[AsyncClient, None]:
     """Create a test client for making async requests."""
-    client = AsyncClient(transport=ASGITransport(app), base_url="http://test")
-    try:
+    async with AsyncClient(transport=ASGITransport(app), base_url="http://test") as client:
         yield client
-    finally:
-        await client.aclose()
 
 
 @pytest.fixture(scope="session")

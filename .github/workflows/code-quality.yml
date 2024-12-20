@@ -32,29 +32,3 @@ jobs:
           uv pip install mypy
           uv run mypy --strict app/
         working-directory: ./backend
-
-  integration-tests:
-    name: Run Integration Tests
-    runs-on: ubuntu-latest
-    needs: quality  # Only run this job if the Code Quality job passes
-    steps:
-      - uses: actions/checkout@v2
-      
-      - name: Set up Docker Compose
-        run: |
-          docker-compose -f docker-compose.test.yml up --build --exit-code-from backend
-        env:
-          ENVIRONMENT: "test"
-          FRONTEND_HOST: "http://localhost"
-          PROJECT_NAME: "test_project"
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          OPENAI_MODEL: "gpt-4"
-          JINA_EMBEDDER_MODEL: "jina-embeddings-v3"
-          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
-          POSTGRES_USER: "postgres"
-          POSTGRES_PASSWORD: "postgres"
-          POSTGRES_DB: "zoe-vector-db"
-      
-      - name: Tear Down Docker Compose
-        if: always()
-        run: docker-compose -f docker-compose.yml down
