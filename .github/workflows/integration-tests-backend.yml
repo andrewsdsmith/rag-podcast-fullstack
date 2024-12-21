@@ -2,10 +2,10 @@ name: Backend Integration Tests
 
 on:
     push:
-        branches:
-          - main
+      branches:
+        - main
     pull_request:
-    types:
+      types:
         - opened
         - synchronize
 
