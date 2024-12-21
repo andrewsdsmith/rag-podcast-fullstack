@@ -19,12 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Set up Docker Compose
-        run: |
-          # Ensure clean state
-          docker compose -f docker-compose.test.yml down -v --remove-orphans
-          # Run tests
-          docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from backend
+      - name: Clean up old containers and volumes
+        run: docker compose -f docker-compose.test.yml down -v --remove-orphans
+      - name: Spinup containers and run tests
+        run: docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from backend
         env:
           ENVIRONMENT: "staging"
           FRONTEND_HOST: "http://localhost"
@@ -38,4 +36,4 @@ jobs:
           POSTGRES_DB: "zoe-vector-db"
       - name: Tear Down Docker Compose
         if: always()
-        run: docker compose -f docker-compose.test.yml down
+        run: docker compose -f docker-compose.test.yml down -v --remove-orphans
