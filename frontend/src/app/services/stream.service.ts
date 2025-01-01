@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 import { ServerSentEventMessage } from '@app/models/server-sent-event-message';
 import { QuestionRequest } from '@models/question-request';
+
 @Injectable({
   providedIn: 'root',
 })
@@ -10,71 +11,34 @@ export class StreamService {
 
   connectToServerSentEvents(
     url: string,
-    body: QuestionRequest
+    questionRequest: QuestionRequest
   ): Observable<string> {
     return new Observable<string>((observer) => {
-      fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-        },
-        body: JSON.stringify(body),
-      })
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
+      const queryParams = new URLSearchParams(
+        questionRequest.question
+      ).toString();
+      const fullUrl = `${url}?question=${queryParams}`;
+      const eventSource = new EventSource(fullUrl);
 
-          const reader = response.body?.getReader();
-          const decoder = new TextDecoder();
+      eventSource.onmessage = (event) => {
+        const data = JSON.parse(event.data) as ServerSentEventMessage;
 
-          function push() {
-            reader
-              ?.read()
-              .then(({ done, value }) => {
-                if (done) {
-                  observer.complete();
-                  return;
-                }
+        const messageContent = data.message.replace(/\n/g, '<br>');
+        observer.next(messageContent);
+      };
 
-                const chunk = decoder.decode(value, { stream: true });
-                const lines = chunk.split('\n');
+      eventSource.onerror = (error) => {
+        const data = JSON.parse(
+          (error as MessageEvent).data
+        ) as ServerSentEventMessage;
+        observer.error(data);
 
-                lines.forEach((line) => {
-                  if (line.startsWith('data: ')) {
-                    const data = JSON.parse(
-                      line.slice(6)
-                    ) as ServerSentEventMessage;
+        eventSource.close();
+      };
 
-                    if (data.message === '[DONE]') {
-                      observer.complete();
-                    } else {
-                      const messageContent = data.message.replace(
-                        /\n/g,
-                        '<br>'
-                      );
-                      observer.next(messageContent);
-                    }
-                  }
-                });
-
-                push();
-              })
-              .catch((error) => {
-                observer.error(error);
-              });
-          }
-
-          push();
-
-          return () => {
-            reader?.cancel();
-          };
-        })
-        .catch((error) => {
-          observer.error(error);
-        });
+      return () => {
+        eventSource.close();
+      };
     });
   }
 }
