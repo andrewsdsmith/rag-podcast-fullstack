@@ -17,8 +17,7 @@ services:
     networks:
       - rag-network
     healthcheck:
-      test:
-        ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -31,11 +30,6 @@ services:
     restart: "no"
     build:
       context: ./backend
-    command:
-      - fastapi
-      - run
-      - --reload
-      - "app/main.py"
     environment:
       ENVIRONMENT: ${ENVIRONMENT}
       FRONTEND_HOST: ${FRONTEND_HOST}
@@ -51,16 +45,6 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     networks:
       - rag-network
-    develop:
-      watch:
-        - path: ./backend
-          action: sync
-          target: /app
-          ignore:
-            - ./backend/.venv
-            - .venv
-        - path: ./backend/pyproject.toml
-          action: rebuild
 
   frontend:
     container_name: frontend

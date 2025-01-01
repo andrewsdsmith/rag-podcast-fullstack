@@ -22,13 +22,14 @@ async def stream_completion(
             ],
             stream=True,
         )
-
-        full_response = ""
-        for chunk in response:
-            if chunk.choices[0].delta.content:
-                content = chunk.choices[0].delta.content
-                full_response += content + CHUNK_DELIMITER
-                yield content, full_response
     except Exception as e:
-        logger.error(f"Error in OpenAI stream: {e}", exc_info=True)
+        logger.error(f"[LLM STREAMING ERROR] - {e}")
         raise
+
+    full_response = ""
+
+    for chunk in response:
+        if chunk.choices[0].delta.content:
+            content = chunk.choices[0].delta.content
+            full_response += content + CHUNK_DELIMITER
+            yield content, full_response
