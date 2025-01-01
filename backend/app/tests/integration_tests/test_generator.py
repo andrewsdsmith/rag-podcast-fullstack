@@ -56,7 +56,7 @@ async def test_generator_endpoint_cached_response(client: AsyncClient) -> None:
 
     assert len(lines1) == len(lines2)
 
-    for line1, line2 in zip(lines1, lines2):
+    for line1, line2 in zip(lines1, lines2, strict=False):
         assert line1 == line2
         assert "event: error" not in line1
         assert "event: error" not in line2
