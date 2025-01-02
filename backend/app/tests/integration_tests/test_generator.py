@@ -11,7 +11,6 @@ def generate_endpoint_from_question(question: str) -> str:
     return f"{GENERATOR_ENDPOINT}?question={question}"
 
 
-# TODO: clear database before running tests
 async def test_generator_endpoint(client: AsyncClient) -> None:
     """Test the generator endpoint."""
     test_question = "Is intermittent fasting healthy?"

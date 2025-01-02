@@ -13,7 +13,7 @@ class ServerSentEvent(BaseModel):
 
     type: Literal["message", "error"]
     # Wrapper for the message to ensure special characters are preserved
-    message: ServerSentEventMessage
+    message: ServerSentEventMessage | str
 
     @classmethod
     def from_message(
@@ -23,6 +23,8 @@ class ServerSentEvent(BaseModel):
         return cls(type=type, message=ServerSentEventMessage(message=message))
 
     def serialize(self) -> str:
-        return (
-            f"event: {self.type}\ndata: {dumps(self.message.model_dump()).decode()}\n\n"
-        )
+        if isinstance(self.message, ServerSentEventMessage):
+            message_data = dumps(self.message.model_dump()).decode()
+        else:
+            message_data = self.message
+        return f"event: {self.type}\ndata: {message_data}\n\n"

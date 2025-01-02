@@ -21,6 +21,12 @@ export class StreamService {
       const eventSource = new EventSource(fullUrl);
 
       eventSource.onmessage = (event) => {
+        if (event.data === '[DONE]') {
+          observer.complete();
+          eventSource.close();
+          return;
+        }
+
         const data = JSON.parse(event.data) as ServerSentEventMessage;
 
         const messageContent = data.message.replace(/\n/g, '<br>');
