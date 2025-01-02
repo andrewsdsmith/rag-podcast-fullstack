@@ -14,6 +14,7 @@ from app.models.answer import Answer
 
 @pytest.fixture(scope="session")
 def anyio_backend() -> str:
+    """Return the backend for the anyio library. Used by httpx."""
     return "asyncio"
 
 
@@ -28,6 +29,9 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 
 @pytest.fixture(scope="session")
 def db() -> Generator[Session, None, None]:
+    """
+    Create one session for the database.
+    """
     with Session(engine) as session:
         yield session
 
