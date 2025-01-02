@@ -1,16 +1,15 @@
 import asyncio
 import logging
 from collections.abc import AsyncGenerator
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
 
 from app.api.deps import DbSession, PipelineBuilderDep
 from app.core.constants import CHUNK_DELIMITER
+from app.models.question_request import QuestionRequest
 from app.models.server_sent_event import ServerSentEvent
 from app.services import cache, llm_service
-from app.models.question_request import QuestionRequest
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -43,7 +42,7 @@ async def generate_pipeline_prompt(
         pipeline_prompt_model = prompt_augmenter.run(
             {"embedder": {"text": question}, "retriever": {"top_k": 15}}
         )
-        prompt = pipeline_prompt_model["prompt"]["prompt"]
+        prompt: str = pipeline_prompt_model["prompt"]["prompt"]
         logger.info(f"Generated prompt: {prompt[:200]}...")
         return prompt
     except Exception:
@@ -61,9 +60,9 @@ async def stream_llm_response(
     session: DbSession,
 ) -> AsyncGenerator[str, None]:
     """Stream LLM response with proper error handling."""
-    response: Optional[str] = None
+    response: str | None = None
     try:
-        async for chunk, response in llm_service.stream_completion(
+        async for chunk, response in llm_service.stream_completion(  # noqa: B007
             system_prompt, user_prompt
         ):
             yield ServerSentEvent.from_message(message=chunk).serialize()
@@ -119,7 +118,7 @@ async def question_answer(
             User Question:
             
             {validated_question}
-            """
+            """  # noqa: W293
 
         return StreamingResponse(
             stream_llm_response(

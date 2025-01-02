@@ -3,13 +3,13 @@ from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlmodel import Session, select, delete
+from sqlmodel import Session, delete, select
 
 from app.core.db import engine
 from app.main import app
+from app.models.answer import Answer
 from app.models.podcast_segment_summary import PodcastSegmentSummary
 from app.models.question import Question
-from app.models.answer import Answer
 
 
 @pytest.fixture(scope="session")
