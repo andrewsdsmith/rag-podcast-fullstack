@@ -1,5 +1,6 @@
 import pytest
 from httpx import AsyncClient
+from unittest.mock import patch
 
 pytestmark = pytest.mark.asyncio
 
@@ -63,29 +64,20 @@ async def test_generator_endpoint_cached_response(client: AsyncClient) -> None:
         assert "event: error" not in line2
 
 
-# TODO: Fix this test - mocking openai.chat.completions.create is not working
-# async def test_llm_service_exception(client: AsyncClient) -> None:
-#     """Test handling of LLM service exceptions."""
-#     test_question = "What are the health benefits of exercise?"
+async def test_generator_endpoint_llm_service_exception(client: AsyncClient) -> None:
+    """Test the generator endpoint handles exceptions from llm_service correctly."""
+    test_question = "What is the capital of France?"
 
-#     def test_mock_works():
-#         print("Mock works")
-#         raise Exception("An error occured while trying to generate a response")
+    with patch("app.services.llm_service.stream_completion") as mock_stream_completion:
+        mock_stream_completion.side_effect = Exception("Test exception")
 
-#     # Mock the LLM service to raise an exception
-#     with patch(
-#         "app.api.routes.generator.llm_service.stream_completion",
-#         new_callable=AsyncMock,
-#         side_effect=test_mock_works,
-#     ):
-#         response = await client.get(
-#             generate_endpoint_from_question(test_question),
-#             timeout=30.0,
-#         )
+        response = await client.get(
+            generate_endpoint_from_question(test_question),
+            timeout=30.0,
+        )
 
-#         lines = [line async for line in response.aiter_lines()]
-#         assert any("event: error" in line for line in lines)
-#         assert any(
-#             "An error occured while trying to generate a response" in line
-#             for line in lines
-#         )
+        lines = [line async for line in response.aiter_lines()]
+        print("lines", lines)
+        assert lines
+        assert "event: error" in lines[0]
+        assert "An error occured while trying to generate a response" in lines[1]
