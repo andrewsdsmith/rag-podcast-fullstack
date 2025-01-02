@@ -26,14 +26,15 @@ async def test_generator_endpoint(client: AsyncClient) -> None:
     assert "event: error" not in lines[0]
 
 
-async def test_generator_endpoint_empty_question(client: AsyncClient) -> None:
-    """Test the generator endpoint with an empty question."""
+async def test_generator_endpoint_invalid_question_format(client: AsyncClient) -> None:
+    """Test the generator endpoint with an invalid question format."""
     response = await client.get(
         generate_endpoint_from_question(""),
         timeout=30.0,
     )
 
     assert response.status_code == 422
+    assert response.json()["detail"] == "Invalid question format"
 
 
 async def test_generator_endpoint_cached_response(client: AsyncClient) -> None:
@@ -79,4 +80,32 @@ async def test_generator_endpoint_llm_service_exception(client: AsyncClient) -> 
         print("lines", lines)
         assert lines
         assert "event: error" in lines[0]
-        assert "An error occured while trying to generate a response" in lines[1]
+        assert "Failed to generate response. Please try again later." in lines[1]
+
+
+async def test_generator_endpoint_pipeline_prompt_exception(
+    client: AsyncClient,
+) -> None:
+    """Test the generator endpoint handles exceptions from pipeline prompt generation correctly."""
+    test_question = "What is the meaning of life?"
+
+    with patch(
+        "app.api.routes.generator.generate_pipeline_prompt"
+    ) as mock_generate_pipeline_prompt:
+        mock_generate_pipeline_prompt.side_effect = Exception("Test exception")
+    
+        response = await client.get(
+            generate_endpoint_from_question(test_question),
+            timeout=30.0,
+        )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Internal server error"
+
+
+# async def test_generator_endpoint_cache_save_exception(client: AsyncClient) -> None:
+#     """Test the generator endpoint handles exceptions when saving to cache."""
+#     test_question = "How does photosynthesis work?"
+
+#     with patch("app.services.cache.save_response") as mock_save_response:
+#         mock_save_response.side_effect = Exception("Test exception")
