@@ -12,7 +12,10 @@ logger = logging.getLogger(__name__)
 async def stream_completion(
     system_prompt: str, user_prompt: str
 ) -> AsyncGenerator[tuple[str, str], None]:
-    """Stream completion from OpenAI API."""
+    """Stream completion from OpenAI API.
+
+    Returns: Chunks of the response while accumulating the full response.
+    """
     try:
         response = openai.chat.completions.create(
             model=settings.OPENAI_MODEL,
@@ -22,13 +25,14 @@ async def stream_completion(
             ],
             stream=True,
         )
-
-        full_response = ""
-        for chunk in response:
-            if chunk.choices[0].delta.content:
-                content = chunk.choices[0].delta.content
-                full_response += content + CHUNK_DELIMITER
-                yield content, full_response
     except Exception as e:
-        logger.error(f"Error in OpenAI stream: {e}", exc_info=True)
+        logger.error(f"[LLM STREAMING ERROR] - {e}")
         raise
+
+    full_response = ""
+
+    for chunk in response:
+        if chunk.choices[0].delta.content:
+            chunk_content = chunk.choices[0].delta.content
+            full_response += chunk_content + CHUNK_DELIMITER
+            yield chunk_content, full_response

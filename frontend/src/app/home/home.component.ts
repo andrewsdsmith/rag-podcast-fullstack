@@ -2,12 +2,13 @@ import { CommonModule } from '@angular/common';
 import { Component, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { StreamService } from '@services/stream.service';
-import { ConfigService } from '@services/config.service';
 import { Subscription } from 'rxjs';
 import { ClickOutsideDirective } from '@directives/click-outside.directive';
 import { MarkdownModule } from 'ngx-markdown';
 import { ExampleQuestion } from '@models/example-question';
 import { QuestionRequest } from '@models/question-request';
+import { environment } from '@environments/environment';
+import { ServerSentEventMessage } from '@app/models/server-sent-event-message';
 
 @Component({
   selector: 'app-home',
@@ -22,7 +23,7 @@ export class HomeComponent {
   isLoading = signal(false);
   error = signal(false);
   errorMessage = signal('');
-  apiUrl = this.configService.getConfig().apiUrl;
+  apiUrl = environment.apiUrl;
   showPopup = true;
   showTechStackTooltip = false;
   eventSourceSubscription: Subscription | null = null;
@@ -56,18 +57,15 @@ export class HomeComponent {
     },
   ];
 
-  constructor(
-    private configService: ConfigService,
-    private streamService: StreamService
-  ) {}
+  constructor(private streamService: StreamService) {}
 
   submitQuestion() {
     if (!this.userQuestion.trim()) return;
 
     this.resetState();
 
-    const url = `${this.apiUrl}/generator/question`;
-    const body = { text: this.userQuestion } as QuestionRequest;
+    const url = `${this.apiUrl}/generator`;
+    const body = { question: this.userQuestion } as QuestionRequest;
     this.eventSourceSubscription = this.streamService
       .connectToServerSentEvents(url, body)
       .subscribe({
@@ -79,10 +77,10 @@ export class HomeComponent {
           this.isLoading.set(false);
         },
         error: (err) => {
-          console.error('Error in stream:', err);
+          const event = err as ServerSentEventMessage;
           this.isLoading.set(false);
           this.error.set(true);
-          this.errorMessage.set(this.getErrorMessage(err));
+          this.errorMessage.set(event.message);
         },
       });
   }
@@ -99,13 +97,6 @@ export class HomeComponent {
 
   retrySubmit() {
     this.submitQuestion();
-  }
-
-  getErrorMessage(err: any): string {
-    if (err instanceof Event && err.type === 'error') {
-      return 'Network error. Please check your internet connection and try again.';
-    }
-    return 'An unexpected error occurred. Please try again later.';
   }
 
   populateAndSubmit(question: string) {

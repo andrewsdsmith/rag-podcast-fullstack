@@ -2,7 +2,7 @@ from pydantic import BaseModel, field_validator
 
 
 class QuestionRequest(BaseModel):
-    """POST request model for a question."""
+    """GET request validation model for a question."""
 
     question: str
 

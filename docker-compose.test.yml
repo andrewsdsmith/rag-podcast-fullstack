@@ -12,8 +12,7 @@ services:
     networks:
       - test-network
     healthcheck:
-      test:
-        ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -39,14 +38,20 @@ services:
       POSTGRES_SERVER: db
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - ./backend/coverage:/app/htmlcov
     networks:
       - test-network
     command:
       [
         "pytest",
         "--cov=app",
+        "--cov-report=html",
+        "--cov-report=term",
+        "--cov-fail-under=85",
+        "--cov-config=app/tests/.coveragerc",
         "app/tests/integration_tests/",
-        "-v",
+        "-s",
       ]
 
   nginx:

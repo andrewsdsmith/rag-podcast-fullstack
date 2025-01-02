@@ -2,113 +2,136 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy.exc import TimeoutError
 
 from app.api.deps import DbSession, PipelineBuilderDep
 from app.core.constants import CHUNK_DELIMITER
 from app.models.question_request import QuestionRequest
-from app.models.server_sent_event import ServerSentEvent, ServerSentEventMessage
+from app.models.server_sent_event import ServerSentEvent
 from app.services import cache, llm_service
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/question")
+async def stream_cached_response(response: str) -> AsyncGenerator[str, None]:
+    """Stream a cached response with proper error handling."""
+    try:
+        chunks = [c for c in response.split(CHUNK_DELIMITER) if c]
+        for chunk in chunks:
+            yield ServerSentEvent.from_message(message=chunk).serialize()
+            await asyncio.sleep(0.005)
+        yield ServerSentEvent(type="message", message="[DONE]").serialize()
+    except Exception:
+        logger.exception("Error streaming cached response")
+        yield ServerSentEvent.from_message(
+            type="error",
+            message="Error retrieving cached response",
+        ).serialize()
+
+
+async def generate_pipeline_prompt(
+    question: str,
+    pipeline_builder: PipelineBuilderDep,
+    session: DbSession,
+) -> str:
+    """Generate and validate the pipeline prompt."""
+    try:
+        prompt_augmenter = pipeline_builder.build(session=session)
+        pipeline_prompt_model = prompt_augmenter.run(
+            {"embedder": {"text": question}, "retriever": {"top_k": 15}}
+        )
+        prompt: str = pipeline_prompt_model["prompt"]["prompt"]
+        logger.info(f"Generated prompt: {prompt[:200]}...")
+        return prompt
+    except Exception:
+        logger.exception("Failed to generate pipeline prompt")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to process question",
+        )
+
+
+async def stream_llm_response(
+    system_prompt: str,
+    user_prompt: str,
+    question: str,
+    session: DbSession,
+) -> AsyncGenerator[str, None]:
+    """Stream LLM response with proper error handling."""
+    response: str | None = None
+    try:
+        async for chunk, response in llm_service.stream_completion(  # noqa: B007
+            system_prompt, user_prompt
+        ):
+            yield ServerSentEvent.from_message(message=chunk).serialize()
+            await asyncio.sleep(0)
+        yield ServerSentEvent(type="message", message="[DONE]").serialize()
+    except Exception:
+        logger.exception("LLM streaming failed")
+        yield ServerSentEvent.from_message(
+            type="error",
+            message="Failed to generate response. Please try again later.",
+        ).serialize()
+    else:
+        if response:  # Cache only successful responses
+            try:
+                await cache.save_response(question, response, session)
+            except Exception:
+                logger.exception("Failed to cache response")
+
+
+@router.get("")
 async def question_answer(
-    request: QuestionRequest,
+    question: str,
     pipeline_builder: PipelineBuilderDep,
     session: DbSession,
 ) -> StreamingResponse:
+    """
+    Stream an answer to a question, using cache if available.
+    """
     try:
-        user_question = request.question
-
-        # Check cache
-        cached_answer = await cache.get_cached_response(user_question, session)
-        if cached_answer:
-
-            async def stream_cached() -> AsyncGenerator[str, None]:
-                try:
-                    # Split by delimiter but filter out empty chunks
-                    chunks = [c for c in cached_answer.text.split(CHUNK_DELIMITER) if c]
-                    for chunk in chunks:
-                        if chunk != "[DONE]":  # Don't wrap [DONE] in a message object
-                            event = ServerSentEvent(
-                                data=ServerSentEventMessage(message=chunk)
-                            )
-                            yield event.serialize()
-                            await asyncio.sleep(0.005)
-
-                    # Always send [DONE] in a consistent format
-                    yield ServerSentEvent(
-                        data=ServerSentEventMessage(message="[DONE]")
-                    ).serialize()
-                except Exception as e:
-                    logger.error(f"Error streaming cached response: {e}", exc_info=True)
-                    yield ServerSentEvent(
-                        data=ServerSentEventMessage(
-                            message="Error retrieving cached response"
-                        )
-                    ).serialize()
-
-            return StreamingResponse(stream_cached(), media_type="text/event-stream")
-
-        prompt_augmenter = pipeline_builder.build(session=session)
-        # Generate augmented prompt
-        pipeline_prompt_model = prompt_augmenter.run(
-            {"embedder": {"text": user_question}, "retriever": {"top_k": 15}}
+        # Validate question using pydantic
+        validated_question = QuestionRequest(question=question).question
+    except Exception:
+        logger.exception("Invalid question format")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid question format",
         )
-        system_prompt = pipeline_prompt_model["prompt"]["prompt"]
-        logger.info(f"Generated prompt: {system_prompt[:200]}...")
 
+    try:
+        # Check cache first
+        cached_answer = await cache.get_cached_response(validated_question, session)
+        if cached_answer:
+            return StreamingResponse(
+                stream_cached_response(cached_answer.text),
+                media_type="text/event-stream",
+            )
+
+        # Generate prompt if no cache hit
+        system_prompt = await generate_pipeline_prompt(
+            validated_question, pipeline_builder, session
+        )
         user_prompt = f"""
-        User Question:
-        
-        {user_question}
-        """  # noqa: W293
-
-        async def stream_response() -> AsyncGenerator[str, None]:
-            try:
-                async for (
-                    content,
-                    full_response,  # noqa: B007
-                ) in llm_service.stream_completion(system_prompt, user_prompt):
-                    yield ServerSentEvent(
-                        data=ServerSentEventMessage(message=content)
-                    ).serialize()
-                    await asyncio.sleep(0)
-
-                # Save final response
-                await cache.save_response(user_question, full_response, session)
-                yield ServerSentEvent(
-                    data=ServerSentEventMessage(message="[DONE]")
-                ).serialize()
-
-            except Exception as e:
-                logger.error(f"Error in stream generation: {e}", exc_info=True)
-                yield ServerSentEvent(
-                    data=ServerSentEventMessage(
-                        message=f"Error generating response: {str(e)}"
-                    )
-                ).serialize()
-                yield ServerSentEvent(
-                    data=ServerSentEventMessage(message="[DONE]")
-                ).serialize()
+            User Question:
+            
+            {validated_question}
+            """  # noqa: W293
 
         return StreamingResponse(
-            stream_response(),
+            stream_llm_response(
+                system_prompt, user_prompt, validated_question, session
+            ),
             media_type="text/event-stream",
             headers={"Cache-Control": "no-cache"},
         )
-
-    except TimeoutError:
-        logger.error("Database connection timeout", exc_info=True)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Unexpected error in question_answer endpoint")
         raise HTTPException(
-            status_code=503,
-            detail="Database connection timeout. Please try again later.",
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error",
         )
-    except Exception as e:
-        logger.error(f"Error processing question: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Error processing question")

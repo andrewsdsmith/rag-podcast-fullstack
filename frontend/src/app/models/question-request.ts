@@ -1,3 +1,3 @@
 export interface QuestionRequest {
-  text: string;
+  question: string;
 }

@@ -18,7 +18,10 @@ export PGPASSWORD="${POSTGRES_PASSWORD}"
 # Check if there is any data in the podcast_segment_summaries table 
 # if not seed it
 if psql -h "${POSTGRES_SERVER}" -p 5432 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "select count(*) from podcast_segment_summaries;" | grep -q "0"; then
-    psql -h "${POSTGRES_SERVER}" -p 5432 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -a -f app/sql/seed.sql
+    psql -h "${POSTGRES_SERVER}" -p 5432 -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -q -f app/sql/seed.sql
+    echo "Database seeded successfully."
+else
+    echo "Database already contains data. No seeding necessary."
 fi
 
 # Run the FastAPI server

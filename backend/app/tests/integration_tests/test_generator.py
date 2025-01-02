@@ -1,45 +1,41 @@
+from unittest.mock import patch
+
 import pytest
 from httpx import AsyncClient
 
 pytestmark = pytest.mark.asyncio
 
+GENERATOR_ENDPOINT = "/api/v1/generator"
+
+
+def generate_endpoint_from_question(question: str) -> str:
+    return f"{GENERATOR_ENDPOINT}?question={question}"
+
+
 async def test_generator_endpoint(client: AsyncClient) -> None:
-    """Test the generator endpoint with a sample question."""
-    test_question = "What are the health benefits of intermittent fasting?"
+    """Test the generator endpoint."""
+    test_question = "Is intermittent fasting healthy?"
 
-    response = await client.post(
-        "/api/v1/generator/question",
-        json={"question": test_question},
+    response = await client.get(
+        generate_endpoint_from_question(test_question),
         timeout=30.0,
     )
 
-    assert response.status_code == 200
-    assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+    lines = [line async for line in response.aiter_lines()]
 
-    # Read and verify the streaming response
-    content = []
-    async for line in response.aiter_lines():
-        if line.startswith("data: "):
-            content.append(line[6:])  # Remove 'data: ' prefix
-        if line == "data: [DONE]":
-            break
-
-    # Verify we received some content
-    assert len(content) > 0
-    # Optional: verify the first chunk is not empty
-    assert len(content[0].strip()) > 0
+    assert lines
+    assert "event: error" not in lines[0]
 
 
-async def test_generator_endpoint_empty_question(client: AsyncClient) -> None:
-    """Test the generator endpoint with an empty question."""
-
-    response = await client.post(
-        "/api/v1/generator/question",
-        json={"question": "   "},  # Empty question after stripping
+async def test_generator_endpoint_invalid_question_format(client: AsyncClient) -> None:
+    """Test the generator endpoint with an invalid question format."""
+    response = await client.get(
+        generate_endpoint_from_question(""),
         timeout=30.0,
     )
 
-    assert response.status_code == 422  # Validation error
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Invalid question format"
 
 
 async def test_generator_endpoint_cached_response(client: AsyncClient) -> None:
@@ -47,44 +43,82 @@ async def test_generator_endpoint_cached_response(client: AsyncClient) -> None:
     test_question = "What are the health benefits of exercise?"
 
     # First request to cache the response
-    response1 = await client.post(
-        "/api/v1/generator/question",
-        json={"question": test_question},
+    response1 = await client.get(
+        generate_endpoint_from_question(test_question),
         timeout=30.0,
     )
-    assert response1.status_code == 200
-
-    # Collect content from first response
-    content1 = []
-    async for line in response1.aiter_lines():
-        if line.startswith("data: "):
-            data = line[6:]
-            if data != "[DONE]":
-                content1.append(data)
 
     # Second request should use cached response
-    response2 = await client.post(
-        "/api/v1/generator/question",
-        json={"question": test_question},
+    response2 = await client.get(
+        generate_endpoint_from_question(test_question),
         timeout=30.0,
     )
 
-    assert response2.status_code == 200
-    assert response2.headers["content-type"] == "text/event-stream; charset=utf-8"
+    lines1 = [line async for line in response1.aiter_lines()]
+    lines2 = [line async for line in response2.aiter_lines()]
 
-    # Collect content from second response
-    content2 = []
-    async for line in response2.aiter_lines():
-        if line.startswith("data: "):
-            data = line[6:]
-            if data != "[DONE]":
-                content2.append(data)
+    assert len(lines1) == len(lines2)
 
-    # Verify both responses are not empty
-    assert len(content1) > 0
-    assert len(content2) > 0
+    for line1, line2 in zip(lines1, lines2, strict=False):
+        assert line1 == line2
+        assert "event: error" not in line1
+        assert "event: error" not in line2
 
-    # Join all content and compare the full text
-    full_response1 = "".join(content1)
-    full_response2 = "".join(content2)
-    assert full_response1 == full_response2
+
+async def test_generator_endpoint_llm_service_exception(client: AsyncClient) -> None:
+    """Test the generator endpoint handles exceptions from llm_service correctly."""
+    test_question = "What is the capital of France?"
+
+    with patch("app.services.llm_service.stream_completion") as mock_stream_completion:
+        mock_stream_completion.side_effect = Exception("Test exception")
+
+        response = await client.get(
+            generate_endpoint_from_question(test_question),
+            timeout=30.0,
+        )
+
+        lines = [line async for line in response.aiter_lines()]
+
+        assert lines
+        assert "event: error" in lines[0]
+        assert "Failed to generate response. Please try again later." in lines[1]
+
+
+async def test_generator_endpoint_pipeline_prompt_exception(
+    client: AsyncClient,
+) -> None:
+    """Test the generator endpoint handles exceptions from pipeline prompt generation correctly."""
+    test_question = "Is yoghurt healthy?"
+
+    with patch(
+        "app.api.routes.generator.generate_pipeline_prompt"
+    ) as mock_generate_pipeline_prompt:
+        mock_generate_pipeline_prompt.side_effect = Exception("Test exception")
+
+        response = await client.get(
+            generate_endpoint_from_question(test_question),
+            timeout=30.0,
+        )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Internal server error"
+
+
+async def test_generator_endpoint_prompt_augmentation_exception(
+    client: AsyncClient,
+) -> None:
+    """Test the generator endpoint handles exceptions from pipeline builder correctly."""
+    test_question = "Is intermittent fasting healthy?"
+
+    with patch(
+        "app.services.pipeline.pipeline_builder.PipelineBuilder.build"
+    ) as mock_pipeline_builder:
+        mock_pipeline_builder.side_effect = Exception("Haystack pipeline build failed")
+
+        response = await client.get(
+            generate_endpoint_from_question(test_question),
+            timeout=30.0,
+        )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to process question"
