@@ -77,7 +77,7 @@ async def test_generator_endpoint_llm_service_exception(client: AsyncClient) -> 
         )
 
         lines = [line async for line in response.aiter_lines()]
-        print("lines", lines)
+
         assert lines
         assert "event: error" in lines[0]
         assert "Failed to generate response. Please try again later." in lines[1]
@@ -87,13 +87,13 @@ async def test_generator_endpoint_pipeline_prompt_exception(
     client: AsyncClient,
 ) -> None:
     """Test the generator endpoint handles exceptions from pipeline prompt generation correctly."""
-    test_question = "What is the meaning of life?"
+    test_question = "Is yoghurt healthy?"
 
     with patch(
         "app.api.routes.generator.generate_pipeline_prompt"
     ) as mock_generate_pipeline_prompt:
         mock_generate_pipeline_prompt.side_effect = Exception("Test exception")
-    
+
         response = await client.get(
             generate_endpoint_from_question(test_question),
             timeout=30.0,
@@ -103,9 +103,21 @@ async def test_generator_endpoint_pipeline_prompt_exception(
         assert response.json()["detail"] == "Internal server error"
 
 
-# async def test_generator_endpoint_cache_save_exception(client: AsyncClient) -> None:
-#     """Test the generator endpoint handles exceptions when saving to cache."""
-#     test_question = "How does photosynthesis work?"
+async def test_generator_endpoint_prompt_augmentation_exception(
+    client: AsyncClient,
+) -> None:
+    """Test the generator endpoint handles exceptions from pipeline builder correctly."""
+    test_question = "Is intermittent fasting healthy?"
 
-#     with patch("app.services.cache.save_response") as mock_save_response:
-#         mock_save_response.side_effect = Exception("Test exception")
+    with patch(
+        "app.services.pipeline.pipeline_builder.PipelineBuilder.build"
+    ) as mock_pipeline_builder:
+        mock_pipeline_builder.side_effect = Exception("Haystack pipeline build failed")
+
+        response = await client.get(
+            generate_endpoint_from_question(test_question),
+            timeout=30.0,
+        )
+
+        assert response.status_code == 500
+        assert response.json()["detail"] == "Failed to process question"
