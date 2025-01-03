@@ -74,4 +74,4 @@ bash deploy.sh
 2. In the root directory run `docker compose -f docker-compose-local.yml up --build`
 3. The application will be available at `http://localhost:80`
 
-> **Note:** Don't fogret to set up your environment variables in your `.env` file. See [Prerequisites](#prerequisites) for more information.
+> **Note:** Don't forget to set up your environment variables in a `.env` file. See [Prerequisites](#prerequisites) for more information.
