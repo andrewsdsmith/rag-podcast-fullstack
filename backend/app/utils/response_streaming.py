@@ -2,12 +2,9 @@ import asyncio
 import logging
 from collections.abc import AsyncGenerator
 
-from fastapi import APIRouter
-
 from app.core.constants import CHUNK_DELIMITER
 from app.models.server_sent_event import ServerSentEvent
 
-router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
