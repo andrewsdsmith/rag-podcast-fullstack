@@ -6,7 +6,7 @@ on:
       environment:
         description: "Target environment"
         required: true
-        default: "development"
+        default: "staging"
 env:
   AWS_REGION: eu-west-2
   ECR_REPOSITORY_FRONTEND: rag-podcast-fullstack/frontend
@@ -15,6 +15,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
 
     steps:
       - name: Checkout code
