@@ -37,7 +37,7 @@ Therefore, to run the application in any environment you will need to have the f
 - A Jina Embeddings API key. This is available for free at [Jina Embeddings API](https://jina.ai/embeddings/)
 - An OpenAI API key.
 
-I have provided a `.env.template` file in the root directory that you can use to set up your environment variables. You can use this to setup your `.env` and fill in the required values for local development. For deployment you can update your Github secrets which will be used in the [workflow](.github/workflows/deploy.yml) to copy over the environment variables using AWS SSM.
+I have provided a `.env.template` file in the root directory that you can use to set up a `.env` file for local development. For deployment you can update your Github secrets which will be used in the [workflow](.github/workflows/deploy.yml) to copy over the environment variables using AWS SSM.
 
 # Code Quality
 
