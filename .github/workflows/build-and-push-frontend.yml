@@ -6,7 +6,7 @@ on:
       environment:
         description: "Target environment"
         required: true
-        default: "development"
+        default: "staging"
 
 env:
   AWS_REGION: eu-west-2
