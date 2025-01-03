@@ -26,9 +26,18 @@ Thank you amazing and clever people at:
 
 ## Prerequisites
 
-I did some preprocessing to the transcripts that included summarising 5 minute segments and creating embeddings using `jinaai/jina-embeddings-v3`. This model ranks highly on the [MTEB leaderboard](https://huggingface.co/spaces/mteb/leaderboard) considering it's size, has a small memory footprint and produces a rich 1024 dimensional embedding.
+I did some preprocessing to the transcripts that included summarising 5 minute segments and creating embeddings using `jinaai/jina-embeddings-v3`. This model ranks highly on the [MTEB leaderboard](https://huggingface.co/spaces/mteb/leaderboard) considering it's size, has a small memory footprint and produces a rich 1024 dimensional embedding. Thereofore, the same model has been used for generating embeddings of user questions before cosine similarity search on the podcast transcripts.
 
-The preprocessing has been left out of this repo as it doesn't fit the scope of this particular project. If you would like to know more about the preprocessing or have any questions, please feel free to reach out.
+> **Note:** The preprocessing has been left out of this repo as it doesn't fit the scope of this particular project. It was run "once-off" and not designed to be a real-time pipeline into our database.
+
+For the answer generation I have used OpenAI's GPT-4 model.
+
+Therefore, to run the application in any environment you will need to have the following:
+
+- A Jina Embeddings API key. This is available for free at [Jina Embeddings API](https://jina.ai/embeddings/)
+- An OpenAI API key.
+
+I have provided a `.env.template` file in the root directory that you can use to set up your environment variables. You can use this to setup your `.env` and fill in the required values for local development. For deployment you can update your Github secrets which will be used in the [workflow](.github/workflows/deploy.yml) to copy over the environment variables using AWS SSM.
 
 # Code Quality
 
@@ -60,6 +69,8 @@ bash deploy.sh
 > If you haven't generated certificates before you will first need to register a domain and point it to your EC2 IP address. Then on your EC2 run the certbot container with a limited [nginx config](/nginx.conf) (allowing http traffic initially) to retrieve the certificate for your domain. Don't forget to use the [production nginx config](/nginx.deployment.conf) after you have the certificate.
 
 ## Running the application locally
+
+> **Note:** Don't fogret to set up your environment variables in the `.env` file. See [Prerequisites](#prerequisites) for more information.
 
 1. Clone the repo
 2. In the root directory run `docker compose -f docker-compose-local.yml up --build`
