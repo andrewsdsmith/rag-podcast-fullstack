@@ -1,10 +1,11 @@
 ## RAG Application for Zoe Science & Nutrition Podcast
 
-> **Note:** This is a hobby project used to expand my own knowledge. The information contained here is based on the use of the application in this context.
+> [!NOTE]
+> This is a hobby project used to expand my own knowledge. The information contained here is based on the use of the application in this context.
 
 [Zoe Science & Nutrition](https://www.youtube.com/@joinZOE) is a popular and informative health and nutrition podcast. This repo contains a Fullstack RAG application that allows users to make health queries that are answered using the podcast transcripts. Answers include episode titles and links to 5-minute youtube segments where the topic was discussed.
 
-The application is deployed to an EC2 instance and is currently available at [healthchat.jasmine-tea.xyz](https://healthchat.jasmine-tea.xyz/) as a demonstration.
+There is a short video demonstration of the app deployed to an EC2 instance [here](https://www.loom.com/share/4abef3c871c044beac04e553bba29409?sid=f6f485b8-4aff-45c0-9ef8-2a62fe878048).
 
 You can also run it locally using Docker by following the instructions in [Running the application locally](#running-the-application-locally).
 
@@ -28,7 +29,8 @@ Thank you amazing and clever people at:
 
 I did some preprocessing to the transcripts that included summarising 5 minute segments and creating embeddings using `jinaai/jina-embeddings-v3`. This model ranks highly on the [MTEB leaderboard](https://huggingface.co/spaces/mteb/leaderboard) considering it's size, has a small memory footprint and produces a rich 1024 dimensional embedding. Therefore, the same model has been used for generating embeddings of user questions before cosine similarity search on the podcast transcripts.
 
-> **Note:** The preprocessing has been left out of this repo as it doesn't fit the scope of this particular project. It was run "once-off" and not designed to be a real-time pipeline into our database.
+> [!NOTE]
+> The preprocessing has been left out of this repo as it doesn't fit the scope of this particular project. It was run "once-off" and not designed to be a real-time pipeline into our database.
 
 For the answer generation I have used OpenAI's GPT-4 model.
 
@@ -65,7 +67,7 @@ On your EC2 instance you can spinup the application using the deployment script 
 bash deploy.sh
 ```
 
-> **Note:**
+> [!IMPORTANT]
 > If you haven't generated certificates before you will first need to register a domain and point it to your EC2 IP address. Then on your EC2 run the certbot container with a limited [nginx config](/nginx.conf) (allowing http traffic initially) to retrieve the certificate for your domain. Don't forget to use the [production nginx config](/nginx.deployment.conf) after you have the certificate.
 
 ## Running the application locally
@@ -74,4 +76,5 @@ bash deploy.sh
 2. In the root directory run `docker compose -f docker-compose-local.yml up --build`
 3. The application will be available at `http://localhost:80`
 
-> **Note:** Don't forget to set up your environment variables in a `.env` file. See [Prerequisites](#prerequisites) for more information.
+> [!IMPORTANT]
+> Don't forget to set up your environment variables in a `.env` file. See [Prerequisites](#prerequisites) for more information.
